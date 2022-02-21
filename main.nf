@@ -59,14 +59,13 @@ workflow {
         CAT_TRIM_FASTQ.out.read2,
         ch_genomeIndex
     )
-    // calculate mitocondrial reads ratio
     GENERATE_FRAGMENTS(
         BOWTIE2.out.bam,
         BOWTIE2.out.bai
     )
     REPORT(
         //CAT_TRIM_FASTQ.out.report,
-        //BOWTIE2.out.report,
+        BOWTIE2.out.mappingReport,
         GENERATE_FRAGMENTS.out.fragmentFile,
         GENERATE_FRAGMENTS.out.fragmentIndex
     )

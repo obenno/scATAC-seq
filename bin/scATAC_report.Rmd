@@ -21,6 +21,7 @@ params:
   blacklist_fraction_cutoff: 0.05
   nucleosome_signal_cutoff: 4
   TSS_enrichment_cutoff: 2
+  bowtie2_report: NULL
 ---
 
 ```{r include=FALSE}
@@ -35,6 +36,7 @@ library(EnsDb.Mmusculus.v79)
 library(patchwork)
 library(future)
 library(plotly)
+library(jsonlite)
 
 set.seed(1234)
 plan("multisession", workers = as.numeric(params$cpus))
@@ -334,16 +336,27 @@ Plot
 Row
 ----------
 
-### Mapping (Fake values)
+### Mapping Result
 
 ```{r}
+if(!is.null(params$bowtie2_report)){
+  mappingReport <- read_json(params$bowtie2_report)
+}
+frag_tibble <- read_tsv(params$fragmentFile, col_names = c("chr", "start", "end", "barcode", "count"))
+totalFrag <- frag_tibble %>% dplyr::pull(count) %>% sum()
+mito_counts <- frag_tibble %>% dplyr::filter(chr=="chrM") %>% dplyr::pull(count) %>% sum()
+nfr_counts <- frag_tibble %>% dplyr::filter(end-start<=147) %>% dplyr::pull(count) %>% sum()
+monoNucleosome_counts <- frag_tibble %>% dplyr::filter(end-start>147, end-start<=294) %>% dplyr::pull(count) %>% sum()
 tribble(
   ~"", ~"",
-  "Uniquely mapped reads", "100",
-  "Unmapped reads", "100",
-  "Non-nuclear fragments", "100%",
-  "Fragments in nucleosome-free regions", "100",
-  "Fragments in mono-nucleosome regions", "100",
+  "Total read pairs", scales::label_comma()(as.numeric(mappingReport$totalFragments)),
+  "Uniquely mapped read pairs", scales::label_comma()(as.numeric(mappingReport$uniqueReadPair)),
+  "Unique mapping rate", mappingReport$uniqueMappingRate,
+  "Total mapping rate", mappingReport$totalMappingRate,
+  "Total fragments (after dedup)", scales::label_comma()(totalFrag),
+  "Mitochondrial fragments", scales::label_comma()(mito_counts),
+  "Fragments in nucleosome-free regions", scales::label_comma()(nfr_counts),
+  "Fragments in mono-nucleosome regions", scales::label_comma()(monoNucleosome_counts),
 ) %>% kbl() %>% kable_paper("hover") %>%
   column_spec(1, bold = T)
 ```

@@ -14,7 +14,7 @@ process BOWTIE2 {
     output:
     tuple val(sampleID), val(sampleName), path("${sampleID}.sorted.bam")       , emit: bam
     tuple val(sampleID), val(sampleName), path("${sampleID}.sorted.bam.bai")   , emit: bai
-    tuple val(sampleID), val(sampleName), path("${sampleID}.mappingReport.txt")   , emit: bowtie2_report
+    tuple val(sampleID), val(sampleName), path("${sampleID}.mappingReport.json")   , emit: mappingReport
     //path "versions.yml"                       , emit: versions
 
     script:
@@ -34,5 +34,8 @@ process BOWTIE2 {
         samtools sort -@ $task.cpus -o ${sampleID}.sorted.bam
 
     samtools index *.bam
+
+    ## convert report.txt to json
+    bowtie2_report_to_json.sh ${sampleID} ${sampleID}.mappingReport.txt > ${sampleID}.mappingReport.json
     """
 }
