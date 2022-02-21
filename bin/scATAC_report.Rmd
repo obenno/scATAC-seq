@@ -341,6 +341,13 @@ Row
 ```{r}
 if(!is.null(params$bowtie2_report)){
   mappingReport <- read_json(params$bowtie2_report)
+}else{
+  mappingReport <- list(
+    "totalFragments"=NULL,
+    "uniqueReadPair"=NULL,
+    "uniqueMappingRate"=NULL,
+    "totalMappingRate"=NULL
+  )
 }
 frag_tibble <- read_tsv(params$fragmentFile, col_names = c("chr", "start", "end", "barcode", "count"))
 totalFrag <- frag_tibble %>% dplyr::pull(count) %>% sum()
