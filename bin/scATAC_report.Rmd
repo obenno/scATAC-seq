@@ -1,0 +1,426 @@
+---
+title: scATAC-seq Report
+date: "`r Sys.Date()`"
+output:
+  flexdashboard::flex_dashboard:
+    vertical_layout: scroll
+    orientation: rows
+    theme:
+      version: 5
+      bootswatch: sandstone
+params:
+  cpus: 6
+  sampleName: ""
+  fragmentFile: ""
+  refGenome: "hg38"
+  genomeSize: NULL
+  macs2: NULL
+  nCount_min: 3000
+  nCount_max: 20000
+  FRiP_cutoff: 0.15
+  blacklist_fraction_cutoff: 0.05
+  nucleosome_signal_cutoff: 4
+  TSS_enrichment_cutoff: 2
+---
+
+```{r include=FALSE}
+library(tidyverse)
+library(scales)
+library(kableExtra)
+library(flexdashboard)
+library(Signac)
+library(Seurat)
+library(GenomeInfoDb)
+library(EnsDb.Mmusculus.v79)
+library(patchwork)
+library(future)
+library(plotly)
+
+set.seed(1234)
+plan("multisession", workers = as.numeric(params$cpus))
+options(future.globals.maxSize = 10 * 1024 ^ 3) # for 10 Gb RAM
+```
+
+```{css echo = FALSE}
+.chart-title {
+  font-size: 1.2rem;
+  font-weight: 700;
+}
+```
+
+
+```{r include=FALSE, cache=TRUE}
+if(params$refGenome == "hg38"){
+    library(EnsDb.Hsapiens.v86)
+    ensdb = EnsDb.Hsapiens.v86
+    genomeSize = 2.7e9
+    blackListObj = blacklist_hg38_unified
+}else if(params$refGenome == "hg19"){
+    library(EnsDb.Hsapiens.v75)
+    ensdb = EnsDb.Hsapiens.v75
+    genomeSize = 2.7e9
+    blackListObj = blacklist_hg19
+##}else if(params$refGenome == "mm9"){
+##    library(EnsDb.Mmusculus.v75)
+##    ensdb = EnsDb.Mmusculus.v75
+##    genomeSize = 1.87e9
+##    blackListObj = blacklist_mm9
+}else if(params$refGenome == "mm10"){
+    library(EnsDb.Mmusculus.v79)
+    ensdb = EnsDb.Mmusculus.v79
+    genomeSize = 1.87e9
+    blackListObj = blacklist_mm10
+}else{
+    ## default load hg38
+    library(EnsDb.Hsapiens.v86)
+    ensdb = EnsDb.Hsapiens.v86
+    genomeSize = 2.7e9
+    blackListObj = blacklist_hg38_unified
+}
+
+## overwrite genomeSize with input parameter
+if(!is.null(params$genomeSize)){
+    genomeSize = params$genomeSize
+}
+
+## Perform analysis
+frag <- CreateFragmentObject(params$fragmentFile)
+macs_peaks <- CallPeaks(frag, macs2.path = params$macs2, effective.genome.size = genomeSize)
+counts <- FeatureMatrix(fragments = frag, features = macs_peaks, 
+                        sep= c(":", "-"))
+                        
+chrom_assay <- CreateChromatinAssay(
+  counts = counts,
+  sep = c(":", "-"),
+  genome = params$refGenome,
+  fragments = params$fragmentFile,
+  min.cells = 10,
+  min.features = 200
+)
+
+scATAC_obj <- CreateSeuratObject(
+  counts = chrom_assay,
+  assay = "peaks"
+)
+
+annotations <- GetGRangesFromEnsDb(ensdb = ensdb)
+seqlevelsStyle(annotations) <- 'UCSC'
+Annotation(scATAC_obj) <- annotations
+
+# compute nucleosome signal score per cell
+scATAC_obj <- NucleosomeSignal(object = scATAC_obj)
+
+# compute TSS enrichment score per cell
+scATAC_obj <- TSSEnrichment(object = scATAC_obj, fast = FALSE)
+
+scATAC_obj$high.tss <- ifelse(scATAC_obj$TSS.enrichment > 2, 'High', 'Low')
+tssPlot <- TSSPlot(scATAC_obj, group.by = 'high.tss') + NoLegend()
+
+scATAC_obj$nucleosome_group <- ifelse(scATAC_obj$nucleosome_signal > 4, 'NS > 4', 'NS < 4')
+fragLenPlot <- FragmentHistogram(object = scATAC_obj, group.by = 'nucleosome_group', region='chr1-1-200000000')
+
+## Calculate fragments in peaks for each cell
+total_fragments <- CountFragments(params$fragmentFile) %>%
+    dplyr::filter(CB %in% colnames(scATAC_obj)) %>% dplyr::select(CB, frequency_count)
+
+scATAC_obj@meta.data <- scATAC_obj@meta.data %>%
+    rownames_to_column("CB") %>%
+    left_join(total_fragments, by="CB") %>%
+    dplyr::rename("fragments" = frequency_count) %>%
+    column_to_rownames("CB")
+
+scATAC_obj <- FRiP(
+  object = scATAC_obj,
+  assay = 'peaks',
+  total.fragments = 'fragments'
+)
+
+scATAC_obj$blacklist_fraction <- FractionCountsInRegion(
+  object = scATAC_obj,
+  assay = 'peaks',
+  regions = blackListObj
+)
+
+qcPlot <- VlnPlot(
+  object = scATAC_obj,
+  features = c('FRiP', 'nCount_peaks',
+               'TSS.enrichment', 'blacklist_fraction', 'nucleosome_signal'),
+  pt.size = 0.1,
+  ncol = 5
+)
+
+## Filter data with naive criteria
+scATAC_obj <- subset(
+  x = scATAC_obj,
+  subset = nCount_peaks > as.numeric(params$nCount_min) &
+    nCount_peaks < as.numeric(params$nCount_max) &
+    FRiP > as.numeric(params$FRiP_cutoff) &
+    blacklist_fraction < as.numeric(params$blacklist_fraction_cutoff) &
+    nucleosome_signal < as.numeric(params$nucleosome_signal_cutoff) &
+    TSS.enrichment > as.numeric(params$TSS_enrichment_cutoff)
+)
+message("Final cells: ", nrow(scATAC_obj@meta.data))
+
+cells <- colnames(scATAC_obj)
+
+d <- colSums(counts) %>% as.data.frame()
+colnames(d) <- "counts"
+d <- d %>% dplyr::arrange(desc(counts)) %>%
+    dplyr::mutate(idx=1:nrow(d)) %>%
+    rownames_to_column("CB") %>%
+    mutate(
+        type=case_when(
+            CB %in% cells ~ "cells",
+            TRUE ~ "background"
+        )
+    )
+
+kneePlot <- ggplot(d, aes(x=idx, y=counts, color=type))+geom_point()+
+    scale_x_log10()+scale_y_log10() +
+    scale_color_manual(values = c("grey", "steelblue")) +
+    theme_bw()+
+    theme(panel.grid = element_blank(),
+          legend.position = "none")
+
+scATAC_obj <- RunTFIDF(scATAC_obj)
+scATAC_obj <- FindTopFeatures(scATAC_obj, min.cutoff = 'q0')
+scATAC_obj <- RunSVD(scATAC_obj)
+
+scATAC_obj <- RunUMAP(object = scATAC_obj, reduction = 'lsi', dims = 2:30)
+scATAC_obj <- FindNeighbors(object = scATAC_obj, reduction = 'lsi', dims = 2:30)
+scATAC_obj <- FindClusters(object = scATAC_obj, verbose = FALSE, algorithm = 3)
+clusterPlot <- DimPlot(object = scATAC_obj, label = TRUE) + NoLegend()
+
+saveRDS(scATAC_obj, file=paste0(params$sampleName, ".rds"))
+```
+
+Analysis Result {data-orientation=rows}
+====================
+
+
+<h2>Sample: `r params$sampleName` (`r params$refGenome`)</h2>
+
+Row
+----------
+
+### Estimated Number of Cells
+
+```{r}
+valueBox(scales::label_comma()(length(cells)), caption = "Estimated number of cells", icon="fa-circle-notch", color="primary")
+```
+
+### Estimated Number of Cells
+
+```{r}
+cellFrag_median <- scATAC_obj[["fragments"]] %>% pull(fragments) %>% median() %>% as.integer()
+valueBox(scales::label_comma()(cellFrag_median), caption = "Median fragments per cell", icon="fa-chart-bar", color="danger")
+```
+
+### Estimated Number of Cells
+
+```{r}
+cellFRiP_median <- scATAC_obj[["FRiP"]] %>% pull(FRiP) %>% median()
+valueBox(scales::label_percent(0.01)(cellFRiP_median), caption = "Median fraction of fragments overlapping peaks", icon="fa-barcode", color="info")
+```
+
+Row
+----------
+
+### Cells
+
+```{r}
+cellFrag_mean <- scATAC_obj[["fragments"]] %>% pull(fragments) %>% mean() %>% as.integer()
+cellFRiP_mean <- scATAC_obj[["FRiP"]] %>% pull(FRiP) %>% mean()
+tribble(
+  ~"", ~"",
+  "Estimated number of cells", scales::label_comma()(length(cells)),
+  "Mean fragments per cell", scales::label_comma()(cellFrag_mean),
+  "Median fragments per cell", scales::label_comma()(cellFrag_median),
+  "Mean of FRiP in cells", scales::label_percent(0.01)(cellFRiP_mean),
+  "Median of FRiP in cells", scales::label_percent(0.01)(cellFRiP_median),
+  ##"Fraction of transposition events in peaks in cells", "100",
+) %>% kbl() %>% kable_paper("hover") %>%
+  column_spec(1, bold = T) %>%
+  footnote(number = c("FRiP: fraction of fragments overlapping peaks"))
+```
+
+### Sequencing
+
+```{r}
+tribble(
+  ~"", ~"",
+  "Raw Reads", "100",
+  "Valid barcodes", "100%",
+  "Q30 bases in barcodes", "100%",
+  "Q30 bases in read 1", "100%",
+  "Q30 bases in read 2", "100%"
+) %>% kbl() %>% kable_paper("hover") %>%
+  column_spec(1, bold = T)
+```
+
+Row {data-height=500}
+----------
+
+### Cells Knee Plot
+
+```{r}
+kneePlot + xlab("Barcode") + ylab("Fragments")
+```
+
+### Cells Fragments Distribution
+
+```{r}
+ggplot(d, aes(counts, color=type, fill=type)) + geom_density(alpha=0.4)+
+  scale_x_log10() + xlab("Fragments") + theme_bw() + 
+  theme(panel.grid=element_blank(), legend.position=c(0.8,0.9), legend.title=element_blank()) +
+  scale_fill_manual(values=c("grey", "steelblue")) +
+  scale_color_manual(values=c("grey", "steelblue"))
+```
+
+Row {data-height=600}
+----------
+
+### Cells Metrics
+
+```{r fig.width=15, fig.height=7, fig.fullwidth=TRUE, out.width="100%"}
+qcPlot
+##qcPlot_list <- VlnPlot(
+##  object = scATAC_obj,
+##  features = c('FRiP', 'nCount_peaks',
+##               'TSS.enrichment', 'blacklist_fraction', 'nucleosome_signal'),
+##  pt.size = 0.1,
+##  ncol = 5,
+##  combine = FALSE
+##)
+
+##for(i in length(qcPlot_list)){
+##  qcPlot_list[[i]] %>% ggplotly()
+##}
+
+##ggplotly(qcPlot_list[[1]])
+```
+
+Row {data-height=600}
+----------
+
+### Cluster (Colored by Group)
+
+```{r}
+clusterPlot %>% ggplotly() %>% toWebGL()
+```
+
+### Cluster (Colored by Depth)
+
+```{r}
+scATAC_obj[["logFragments"]] <- log10(scATAC_obj[["fragments"]])
+depthPlot <- FeaturePlot(object = scATAC_obj, features = 'logFragments') + scale_color_continuous(name="log10 Fragments", type = "viridis", direction = -1) + labs(title = NULL)
+depthPlot %>% ggplotly() %>% toWebGL()
+```
+
+Data Quality {data-orientation=rows}
+====================
+
+Row
+----------
+
+### Library Complexity
+
+Library complexity table here
+
+### Median Unique Fragments per cell
+
+Plot
+
+Row
+----------
+
+### Mapping (Fake values)
+
+```{r}
+tribble(
+  ~"", ~"",
+  "Uniquely mapped reads", "100",
+  "Unmapped reads", "100",
+  "Non-nuclear fragments", "100%",
+  "Fragments in nucleosome-free regions", "100",
+  "Fragments in mono-nucleosome regions", "100",
+) %>% kbl() %>% kable_paper("hover") %>%
+  column_spec(1, bold = T)
+```
+
+### Insert Size
+
+```{r}
+fragLenPlot %>% ggplotly() %>% toWebGL()
+```
+
+Row
+----------
+
+### Targeting
+
+```{r}
+tss_score <- scATAC_obj@assays$peaks@positionEnrichment$TSS %>% apply(2, mean) %>% max()
+tribble(
+  ~"", ~"",
+  "Raw macs peaks", scales::label_comma()(length(macs_peaks)),
+  "Peaks after filtration", scales::label_comma()(nrow(scATAC_obj)),
+  "TSS enrichment score", scales::label_number(0.01)(tss_score)
+) %>% kbl() %>% kable_paper("hover") %>%
+  column_spec(1, bold = T)
+```
+
+Row
+----------
+
+### TSS Enrichment
+
+```{r}
+tssPlot %>% ggplotly() %>% toWebGL()
+```
+
+### Peaks Targeting
+
+```{r}
+chrom_assay_raw <- CreateChromatinAssay(
+  counts = counts,
+  sep = c(":", "-"),
+  genome = params$refGenome,
+  fragments = params$fragmentFile,
+  min.cells = 0,
+  min.features = 0
+)
+
+scATAC_raw <- CreateSeuratObject(
+  counts = chrom_assay_raw,
+  assay = "peaks"
+)
+
+total_fragments_raw <- CountFragments(params$fragmentFile) %>%
+    dplyr::filter(CB %in% colnames(scATAC_raw)) %>% dplyr::select(CB, frequency_count)
+
+scATAC_raw@meta.data <- scATAC_raw@meta.data %>%
+    rownames_to_column("CB") %>%
+    left_join(total_fragments_raw, by="CB") %>%
+    dplyr::rename("fragments" = frequency_count) %>%
+    column_to_rownames("CB")
+
+scATAC_raw <- FRiP(
+  object = scATAC_raw,
+  assay = 'peaks',
+  total.fragments = 'fragments'
+)
+
+k <- scATAC_raw@meta.data %>% dplyr::select(FRiP,fragments) %>%
+    tibble::rownames_to_column("CB") %>%
+    mutate(
+        group = case_when(
+            CB %in% cells ~ "cell",
+            TRUE ~ "background"
+    ))
+## Some points have FRiP larger than 1, needs to be checked
+ggplot(k, aes(x=fragments, y=FRiP, color=group))+geom_point(alpha=0.8)+scale_x_log10() + 
+    theme_bw() + scale_color_manual(values=c("grey", "steelblue")) + ylim(0,1) +
+    theme(legend.title=element_blank(), panel.grid=element_blank())
+##ggplotly(p) %>% toWebGL()
+```
