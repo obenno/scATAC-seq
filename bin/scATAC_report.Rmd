@@ -21,6 +21,7 @@ params:
   blacklist_fraction_cutoff: 0.05
   nucleosome_signal_cutoff: 4
   TSS_enrichment_cutoff: 2
+  readReport: NULL
   bowtie2_report: NULL
 ---
 
@@ -115,10 +116,10 @@ scATAC_obj <- NucleosomeSignal(object = scATAC_obj)
 # compute TSS enrichment score per cell
 scATAC_obj <- TSSEnrichment(object = scATAC_obj, fast = FALSE)
 
-scATAC_obj$high.tss <- ifelse(scATAC_obj$TSS.enrichment > 2, 'High', 'Low')
+scATAC_obj$high.tss <- ifelse(scATAC_obj$TSS.enrichment > as.numeric(params$TSS_enrichment_cutoff), 'High', 'Low')
 tssPlot <- TSSPlot(scATAC_obj, group.by = 'high.tss') + NoLegend()
 
-scATAC_obj$nucleosome_group <- ifelse(scATAC_obj$nucleosome_signal > 4, 'NS > 4', 'NS < 4')
+scATAC_obj$nucleosome_group <- ifelse(scATAC_obj$nucleosome_signal > as.numeric(params$nucleosome_signal_cutoff), paste0('NS > ', params$nucleosome_signal_cutoff), paste0('NS < ', params$nucleosome_signal_cutoff))
 fragLenPlot <- FragmentHistogram(object = scATAC_obj, group.by = 'nucleosome_group', region='chr1-1-200000000')
 
 ## Calculate fragments in peaks for each cell
@@ -249,13 +250,27 @@ tribble(
 ### Sequencing
 
 ```{r}
+if(!is.null(params$readReport)){
+  readReport <- read_json(params$readReport)
+}else{
+  readReport <- list(
+    "rawReadPairs"=NULL,
+    "validBarcode_count"=NULL,
+    "validBarcode_readCount"=NULL,
+    "Q30_bcRead"=NULL,
+    "Q30_read1"=NULL,
+    "Q30_read2"=NULL
+  )
+}
+
 tribble(
   ~"", ~"",
-  "Raw Reads", "100",
-  "Valid barcodes", "100%",
-  "Q30 bases in barcodes", "100%",
-  "Q30 bases in read 1", "100%",
-  "Q30 bases in read 2", "100%"
+  "Raw read pairs", scales::label_comma()(as.numeric(readReport$rawReadPairs)),
+  "Valid barcodes", scales::label_comma()(as.numeric(readReport$validBarcode_count)),
+  "Read pairs with valid barcode", scales::label_comma()(as.numeric(readReport$validBarcode_readCount)),
+  "Q30 bases in barcodes", readReport$Q30_bcRead,
+  "Q30 bases in read 1", readReport$Q30_read1,
+  "Q30 bases in read 2", readReport$Q30_read2
 ) %>% kbl() %>% kable_paper("hover") %>%
   column_spec(1, bold = T)
 ```

@@ -13,11 +13,13 @@ process CAT_TRIM_FASTQ {
 
     input:
     tuple val(sampleID), val(sampleName), path(read1_list), path(read2_list)
+    path(whitelist)
 
     output:
     tuple val(sampleID), val(sampleName), path("*_1.merged.cDNA_R1.barcoded.fq.gz"), emit: read1
     tuple val(sampleID), val(sampleName), path("*_2.merged.barcoded.fq.gz"), emit: read2
     tuple val(sampleID), val(sampleName), path("*_1.merged.bc.fq.gz"), emit: read_bc
+    tuple val(sampleID), val(sampleName), path("${sampleID}.readReport.json"), emit: readReport
     //tuple val(sampleID), val(sampleName), path("*.read_stat.txt"), emit: report
     //tuple val(sampleID), val(sampleName), path("*_cutqc_report.html"), emit: cutqc_report
     //path "versions.yml"                       , emit: versions
@@ -36,7 +38,7 @@ process CAT_TRIM_FASTQ {
     ##sinto barcode -b $params.bcLen --barcode_fastq ${prefix}_1.merged.bc.fq.gz \\
     ##--read1 ${prefix}_1.merged.cDNA_R1.fq.gz \\
     ##--read2 ${prefix}_2.merged.fq.gz
-    add_barcode_to_reads.sh $params.bcLen ${prefix}_1.merged.bc.fq.gz ${prefix}_1.merged.cDNA_R1.fq.gz ${prefix}_2.merged.fq.gz
+    add_barcode_to_reads.sh ${sampleID} ${whitelist} $params.bcLen ${prefix}_1.merged.bc.fq.gz ${prefix}_1.merged.cDNA_R1.fq.gz ${prefix}_2.merged.fq.gz > ${sampleID}.readReport.json
 
     ## rename sinto output to fq.gz
     ##mv ${prefix}_1.merged.cDNA_R1.barcoded.fastq.gz ${prefix}_1.merged.cDNA_R1.barcoded.fq.gz

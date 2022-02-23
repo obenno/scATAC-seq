@@ -45,8 +45,12 @@ workflow {
         .map{ create_fastq_channel(it) }
         .groupTuple(by: 0)
         .set{ ch_fastq }
+    ch_whitelist = file(params.whitelist)
     // perform trimming and qc
-    CAT_TRIM_FASTQ( ch_fastq )
+    CAT_TRIM_FASTQ(
+        ch_fastq,
+        ch_whitelist
+    )
     // perform bowtie2 mapping
     // bowtie genome index_base should be the same as the input fasta name
     // when performing bowtie2-build, genomeIndex needs to be set as
@@ -64,7 +68,7 @@ workflow {
         BOWTIE2.out.bai
     )
     REPORT(
-        //CAT_TRIM_FASTQ.out.report,
+        CAT_TRIM_FASTQ.out.readReport,
         BOWTIE2.out.mappingReport,
         GENERATE_FRAGMENTS.out.fragmentFile,
         GENERATE_FRAGMENTS.out.fragmentIndex
