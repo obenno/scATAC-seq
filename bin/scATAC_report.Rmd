@@ -52,7 +52,7 @@ options(future.globals.maxSize = 10 * 1024 ^ 3) # for 10 Gb RAM
 ```
 
 
-```{r include=FALSE, cache=TRUE}
+```{r include=FALSE}
 if(params$refGenome == "hg38"){
     library(EnsDb.Hsapiens.v86)
     ensdb = EnsDb.Hsapiens.v86
