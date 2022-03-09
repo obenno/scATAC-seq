@@ -242,7 +242,7 @@ tribble(
   "Mean of FRiP in cells", scales::label_percent(0.01)(cellFRiP_mean),
   "Median of FRiP in cells", scales::label_percent(0.01)(cellFRiP_median),
   ##"Fraction of transposition events in peaks in cells", "100",
-) %>% kbl() %>% kable_paper("hover") %>%
+) %>% kbl() %>% kable_paper("hover", html_font = "arial, helvetica, sans-serif") %>%
   column_spec(1, bold = T) %>%
   footnote(number = c("FRiP: fraction of fragments overlapping peaks"))
 ```
@@ -271,7 +271,7 @@ tribble(
   "Q30 bases in barcodes", readReport$Q30_bcRead,
   "Q30 bases in read 1", readReport$Q30_read1,
   "Q30 bases in read 2", readReport$Q30_read2
-) %>% kbl() %>% kable_paper("hover") %>%
+) %>% kbl() %>% kable_paper("hover", html_font = "arial, helvetica, sans-serif") %>%
   column_spec(1, bold = T)
 ```
 
@@ -379,7 +379,7 @@ tribble(
   "Mitochondrial fragments", scales::label_comma()(mito_counts),
   "Fragments in nucleosome-free regions", scales::label_comma()(nfr_counts),
   "Fragments in mono-nucleosome regions", scales::label_comma()(monoNucleosome_counts),
-) %>% kbl() %>% kable_paper("hover") %>%
+) %>% kbl() %>% kable_paper("hover", html_font = "arial, helvetica, sans-serif") %>%
   column_spec(1, bold = T)
 ```
 
@@ -401,7 +401,7 @@ tribble(
   "Raw macs peaks", scales::label_comma()(length(macs_peaks)),
   "Peaks after filtration", scales::label_comma()(nrow(scATAC_obj)),
   "TSS enrichment score", scales::label_number(0.01)(tss_score)
-) %>% kbl() %>% kable_paper("hover") %>%
+) %>% kbl() %>% kable_paper("hover", html_font = "arial, helvetica, sans-serif") %>%
   column_spec(1, bold = T)
 ```
 
