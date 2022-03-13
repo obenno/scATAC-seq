@@ -330,7 +330,7 @@ clusterPlot %>% ggplotly() %>% toWebGL()
 
 ```{r}
 scATAC_obj[["logFragments"]] <- log10(scATAC_obj[["fragments"]])
-depthPlot <- FeaturePlot(object = scATAC_obj, features = 'logFragments') + scale_color_continuous(name="log10 Fragments", type = "viridis", direction = -1) + labs(title = NULL)
+depthPlot <- FeaturePlot(object = scATAC_obj, features = 'logFragments') + scale_color_continuous(name="log10 Fragments", type = "viridis", direction = 1) + labs(title = NULL)
 depthPlot %>% ggplotly() %>% toWebGL()
 ```
 
