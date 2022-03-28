@@ -16,8 +16,8 @@ process CAT_TRIM_FASTQ {
     path(whitelist)
 
     output:
-    tuple val(sampleID), val(sampleName), path("*_1.merged.cDNA_R1.barcoded.fq.gz"), emit: read1
-    tuple val(sampleID), val(sampleName), path("*_2.merged.barcoded.fq.gz"), emit: read2
+    tuple val(sampleID), val(sampleName), path("*_1.trimmed.fq.gz"), emit: read1
+    tuple val(sampleID), val(sampleName), path("*_2.trimmed.fq.gz"), emit: read2
     tuple val(sampleID), val(sampleName), path("*_1.merged.bc.fq.gz"), emit: read_bc
     tuple val(sampleID), val(sampleName), path("${sampleID}.readReport.json"), emit: readReport
     //tuple val(sampleID), val(sampleName), path("*.read_stat.txt"), emit: report
@@ -53,5 +53,9 @@ process CAT_TRIM_FASTQ {
 
     ## remove merged fq.gz to save space
     rm ${prefix}_1.merged.fq.gz ${prefix}_2.merged.fq.gz
+
+    ## cutadapt QC and trim ME adapter
+    cutadapt -j $task.cpus -q 30 -m $params.trimLength $params.trimOpt -o ${prefix}_1.trimmed.fq.gz -p ${prefix}_2.trimmed.fq.gz \\
+    ${prefix}_1.merged.cDNA_R1.barcoded.fq.gz ${prefix}_2.merged.barcoded.fq.gz
     """
 }
