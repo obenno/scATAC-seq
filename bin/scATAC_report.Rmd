@@ -185,6 +185,9 @@ kneePlot <- ggplot(d, aes(x=idx, y=counts, color=type))+geom_point()+
     theme(panel.grid = element_blank(),
           legend.position = "none")
 
+## Do not perform clustering when there are too few cells
+
+if(length(cells)>=150){
 scATAC_obj <- RunTFIDF(scATAC_obj)
 scATAC_obj <- FindTopFeatures(scATAC_obj, min.cutoff = 'q0')
 scATAC_obj <- RunSVD(scATAC_obj)
@@ -193,7 +196,7 @@ scATAC_obj <- RunUMAP(object = scATAC_obj, reduction = 'lsi', dims = 2:30)
 scATAC_obj <- FindNeighbors(object = scATAC_obj, reduction = 'lsi', dims = 2:30)
 scATAC_obj <- FindClusters(object = scATAC_obj, verbose = FALSE, algorithm = 3)
 clusterPlot <- DimPlot(object = scATAC_obj, label = TRUE) + NoLegend()
-
+}
 saveRDS(scATAC_obj, file=paste0(params$sampleName, ".rds"))
 ```
 
@@ -323,15 +326,23 @@ Row {data-height=600}
 ### Cluster (Colored by Group)
 
 ```{r}
-clusterPlot %>% ggplotly() %>% toWebGL()
+if(length(cells)>=150){
+  clusterPlot %>% ggplotly() %>% toWebGL()
+}else{
+  cat("Too few cells\n")
+}
 ```
 
 ### Cluster (Colored by Depth)
 
 ```{r}
-scATAC_obj[["logFragments"]] <- log10(scATAC_obj[["fragments"]])
-depthPlot <- FeaturePlot(object = scATAC_obj, features = 'logFragments') + scale_color_continuous(name="log10 Fragments", type = "viridis", direction = 1) + labs(title = NULL)
-depthPlot %>% ggplotly() %>% toWebGL()
+if(length(cells)>=150){
+  scATAC_obj[["logFragments"]] <- log10(scATAC_obj[["fragments"]])
+  depthPlot <- FeaturePlot(object = scATAC_obj, features = 'logFragments') + scale_color_continuous(name="log10 Fragments", type = "viridis", direction = 1) + labs(title = NULL)
+  depthPlot %>% ggplotly() %>% toWebGL()
+}else{
+  cat("Too few cells\n")
+}
 ```
 
 Data Quality {data-orientation=rows}
