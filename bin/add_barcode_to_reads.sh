@@ -80,7 +80,7 @@ awk -v bcLen="$bcLen" -v outbc="$outbc" -v outRead1="$outRead1" -v outRead2="$ou
 
 validBarcode_count=$(awk 'NR%4==1{split($1, tmp, ":"); barcode=substr(tmp[1],2); print barcode}' $outRead1 | sort -u | wc -l)
 validBarcode_readCount=$(awk 'END{print NR/4}' $outRead1)
-rawReadPairs=$(zcat $read1 | awk 'END{print NR/4*2}')
+rawReadPairs=$(zcat $read1 | awk 'END{print NR/4}')
 Q30_bcRead=$(check_q30.awk $outbc)
 Q30_read1=$(check_q30.awk $outRead1)
 Q30_read2=$(check_q30.awk $outRead2)
