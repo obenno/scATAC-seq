@@ -42,6 +42,22 @@ library(jsonlite)
 set.seed(1234)
 plan("multisession", workers = as.numeric(params$cpus))
 options(future.globals.maxSize = 10 * 1024 ^ 3) # for 10 Gb RAM
+
+## Rmd options
+knitr::opts_chunk$set(
+  comment = '', fig.retina = 4,
+  warning = FALSE, message = FALSE
+)
+
+config_plotly_fig <- function(fig){
+    config(
+        fig,
+        displaylogo = FALSE, 
+        modeBarButtonsToRemove = c('zoom', 'pan', 'select', 'zoomIn', 'zoomOut', 'autoScale',
+                                   'hoverClosestCartesian', 'hoverCompareCartesian'),
+        toImageButtonOptions = list(height= NULL, width= NULL, scale= 2)
+    )
+}
 ```
 
 ```{css echo = FALSE}
@@ -327,7 +343,7 @@ Row {data-height=600}
 
 ```{r}
 if(length(cells)>=150){
-  clusterPlot %>% ggplotly() %>% toWebGL()
+  clusterPlot %>% ggplotly() %>% config_plotly_fig() %>% toWebGL()
 }else{
   cat("Too few cells\n")
 }
@@ -339,7 +355,7 @@ if(length(cells)>=150){
 if(length(cells)>=150){
   scATAC_obj[["logFragments"]] <- log10(scATAC_obj[["fragments"]])
   depthPlot <- FeaturePlot(object = scATAC_obj, features = 'logFragments') + scale_color_continuous(name="log10 Fragments", type = "viridis", direction = 1) + labs(title = NULL)
-  depthPlot %>% ggplotly() %>% toWebGL()
+  depthPlot %>% ggplotly() %>% config_plotly_fig() %>% toWebGL()
 }else{
   cat("Too few cells\n")
 }
@@ -397,7 +413,7 @@ tribble(
 ### Insert Size
 
 ```{r}
-fragLenPlot %>% ggplotly() %>% toWebGL()
+fragLenPlot %>% ggplotly() %>% config_plotly_fig() %>% toWebGL()
 ```
 
 Row
@@ -422,7 +438,7 @@ Row
 ### TSS Enrichment
 
 ```{r}
-tssPlot %>% ggplotly() %>% toWebGL()
+tssPlot %>% ggplotly() %>% config_plotly_fig() %>% toWebGL()
 ```
 
 ### Peaks Targeting
