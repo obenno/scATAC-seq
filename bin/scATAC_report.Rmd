@@ -24,6 +24,8 @@ params:
   readReport: NULL
   bowtie2_report: NULL
   saturation_json: NULL
+  libraryComplexity: NULL
+  dupRatio: NULL
 ---
 
 ```{r include=FALSE}
@@ -376,7 +378,23 @@ Row
 
 ### Library Complexity
 
-Library complexity table here
+```{r echo=FALSE}
+read_tsv(params$libraryComplexity) %>%
+    dplyr::rename(
+       "NRF" = `m0/mt`,
+       "PBC1" = `m1/m0`,
+       "PBC2" = `m1/m2`
+    ) %>% 
+    select(NRF, PBC1, PBC2) %>% t() %>% 
+    as.data.frame() %>% rownames_to_column("Measure") %>% 
+    dplyr::rename(Value=V1) %>% 
+    mutate(Value = scales::label_number(0.001)(Value)) %>%
+    kbl() %>% 
+    kable_paper("hover", html_font = "arial, helvetica, sans-serif") %>%
+    column_spec(1, bold = T)
+```
+
+Duplcation Ratio: `r params$dupRatio %>% as.numeric %>% scales::percent(0.01)`
 
 ### Sequencing Saturation
 

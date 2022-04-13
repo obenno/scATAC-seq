@@ -12,6 +12,9 @@ if (!params.genomeIndex) { exit 1, 'Genome Index not specified!' }
 // include all processes
 include { CAT_TRIM_FASTQ } from './cat_trim_fastq' addParams(params)
 include { BOWTIE2 } from './bowtie2_mapping' addParams(params)
+include { LIBRARY_COMPLEXITY } from './library_complexity' addParams(params)
+include { DEDUP } from './dedup' addParams(params)
+include { CHECK_SATURATION } from './sequencing_saturation' addParams(params)
 include { GENERATE_FRAGMENTS } from './generate_fragment' addParams(params)
 include { REPORT } from './report' addParams(params)
 
@@ -63,6 +66,14 @@ workflow {
         CAT_TRIM_FASTQ.out.read2,
         ch_genomeIndex
     )
+    LIBRARY_COMPLEXITY(
+        BOWTIE2.out.bam,
+        BOWTIE2.out.bai
+    )
+    DEDUP(
+        BOWTIE2.out.bam,
+        BOWTIE2.out.bai
+    )
     GENERATE_FRAGMENTS(
         BOWTIE2.out.bam,
         BOWTIE2.out.bai
@@ -70,6 +81,9 @@ workflow {
     REPORT(
         CAT_TRIM_FASTQ.out.readReport,
         BOWTIE2.out.mappingReport,
+        DEDUP.out.dupRatio,
+        LIBRARY_COMPLEXITY.out.libraryComplexity,
+        CHECK_SATURATION.out.outJSON,
         GENERATE_FRAGMENTS.out.fragmentFile,
         GENERATE_FRAGMENTS.out.fragmentIndex
     )
