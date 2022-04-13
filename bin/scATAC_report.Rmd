@@ -23,6 +23,7 @@ params:
   TSS_enrichment_cutoff: 2
   readReport: NULL
   bowtie2_report: NULL
+  saturation_json: NULL
 ---
 
 ```{r include=FALSE}
@@ -371,9 +372,23 @@ Row
 
 Library complexity table here
 
-### Median Unique Fragments per cell
+### Sequencing Saturation
 
-Plot
+```{r}
+if(!is.null(params$saturation_json)){
+  saturation_data <- fromJSON(params$saturation_json) %>%
+      as_tibble() %>%
+      mutate(across(everything(), .fns = as.numeric)) %>%
+      mutate(saturation = 1-uniqueFrags/seqDep) %>%
+      mutate(saturation = scales::label_percent(0.01)(saturation))
+}
+
+plot_ly(saturation_data, x= ~seqDep, y= ~uniqueFrags, text= ~saturation,
+       type = 'scatter', mode = 'lines',
+       hovertemplate = 'Read Pairs: %{x}<br>Unique Fragments: %{y}<br>Saturation: %{text}<extra></extra>') %>%
+    config_plotly_fig() %>%
+    toWebGL()
+```
 
 Row
 ----------
