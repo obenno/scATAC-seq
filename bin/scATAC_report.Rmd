@@ -186,21 +186,14 @@ cells <- colnames(scATAC_obj)
 d <- colSums(counts) %>% as.data.frame()
 colnames(d) <- "counts"
 d <- d %>% dplyr::arrange(desc(counts)) %>%
-    dplyr::mutate(idx=1:nrow(d)) %>%
-    rownames_to_column("CB") %>%
+    dplyr::mutate(Fragments=1:nrow(d)) %>%
+    rownames_to_column("Barcodes") %>%
     mutate(
         type=case_when(
             CB %in% cells ~ "cells",
             TRUE ~ "background"
         )
     )
-
-kneePlot <- ggplot(d, aes(x=idx, y=counts, color=type))+geom_point()+
-    scale_x_log10()+scale_y_log10() +
-    scale_color_manual(values = c("grey", "steelblue")) +
-    theme_bw()+
-    theme(panel.grid = element_blank(),
-          legend.position = "none")
 
 ## Do not perform clustering when there are too few cells
 
@@ -301,7 +294,20 @@ Row {data-height=500}
 ### Cells Knee Plot
 
 ```{r}
-kneePlot + xlab("Barcode") + ylab("Fragments")
+##kneePlot <- ggplot(d, aes(x=idx, y=counts, color=type))+geom_point()+
+##    scale_x_log10()+scale_y_log10() +
+##    scale_color_manual(values = c("grey", "steelblue")) +
+##    theme_bw()+
+##    theme(panel.grid = element_blank(),
+##          legend.position = "none")
+##kneePlot + xlab("Barcode") + ylab("Fragments")
+
+fig <- plot_ly(data = d, x = ~Barcodes, y = ~Fragments, type = 'scatter', mode = 'markers',
+               color = ~type, colors = c('grey', '#002366'),
+               hovertemplate = 'Fragments: %{y}<extra>%{fullData.name}</extra>')
+               ##line = list(width = 3))
+fig <- layout(fig, xaxis = list(type = "log"),yaxis = list(type = "log"), showlegend = FALSE)
+config_plotly_fig(fig) %>% toWebGL()
 ```
 
 ### Cells Fragments Distribution
