@@ -188,11 +188,11 @@ cells <- colnames(scATAC_obj)
 d <- colSums(counts) %>% as.data.frame()
 colnames(d) <- "counts"
 d <- d %>% dplyr::arrange(desc(counts)) %>%
-    dplyr::mutate(Fragments=1:nrow(d)) %>%
-    rownames_to_column("Barcodes") %>%
+    dplyr::mutate(idx=1:nrow(d)) %>%
+    rownames_to_column("CB") %>%
     mutate(
         type=case_when(
-            `Barcodes` %in% cells ~ "cells",
+            `CB` %in% cells ~ "cells",
             TRUE ~ "background"
         )
     )
@@ -304,11 +304,12 @@ Row {data-height=500}
 ##          legend.position = "none")
 ##kneePlot + xlab("Barcode") + ylab("Fragments")
 
-fig <- plot_ly(data = d, x = ~Barcodes, y = ~Fragments, type = 'scatter', mode = 'markers',
+fig <- plot_ly(data = d, x = ~idx, y = ~counts, type = 'scatter', mode = 'markers',
                color = ~type, colors = c('grey', '#002366'),
                hovertemplate = 'Fragments: %{y}<extra>%{fullData.name}</extra>')
                ##line = list(width = 3))
-fig <- layout(fig, xaxis = list(type = "log"),yaxis = list(type = "log"), showlegend = FALSE)
+fig <- layout(fig, xaxis = list(type = "log", title = "Barcodes"), 
+              yaxis = list(type = "log", title = "Fragments"), showlegend = FALSE)
 config_plotly_fig(fig) %>% toWebGL()
 ```
 
