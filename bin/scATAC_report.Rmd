@@ -192,7 +192,7 @@ d <- d %>% dplyr::arrange(desc(counts)) %>%
     rownames_to_column("Barcodes") %>%
     mutate(
         type=case_when(
-            CB %in% cells ~ "cells",
+            `Barcodes` %in% cells ~ "cells",
             TRUE ~ "background"
         )
     )
