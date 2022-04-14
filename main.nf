@@ -74,6 +74,10 @@ workflow {
         BOWTIE2.out.bam,
         BOWTIE2.out.bai
     )
+    CHECK_SATURATION(
+        BOWTIE2.out.bam,
+        BOWTIE2.out.bai
+    )    
     GENERATE_FRAGMENTS(
         BOWTIE2.out.bam,
         BOWTIE2.out.bai
