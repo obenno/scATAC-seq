@@ -12,7 +12,8 @@ process LIBRARY_COMPLEXITY {
 
     shell:
     '''
-    samtools sort -@ !{task.cpus} -n !{inputBam} |
+    samtools view -@ !{task.cpus} -u -f 0x2 -F 0x4 -F 0x8 -F 0x100 -F 0x800 -F 0x400 -q 30 !{inputBam} |
+        samtools sort -@ !{task.cpus} -n -u |
         bedtools bamtobed -bedpe -i - |
         awk 'BEGIN{OFS="\\t"}{print $1, $2, $4, $6, $9, $10}' |
         grep -v !{params.mito_chr_label} | sort --parallel=!{task.cpus} -S 10% -T ./ | uniq -c |
