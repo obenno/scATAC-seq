@@ -11,6 +11,6 @@ process CHECK_SATURATION {
 
     shell:
     """
-    get_sequencing_saturation.sh $inputBAM $task.cpus ${sampleID}.saturation_out.json
+    get_sequencing_saturation.sh $inputBam $task.cpus ${sampleID}.saturation_out.json
     """
 }
