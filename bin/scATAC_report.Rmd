@@ -374,7 +374,7 @@ if(length(cells)>=150){
 Data Quality {data-orientation=rows}
 ====================
 
-Row
+Row {data-height=500}
 ----------
 
 ### Library Complexity
