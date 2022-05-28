@@ -3,7 +3,14 @@ process CAT_TRIM_FASTQ {
     label 'process_medium'
     publishDir "${params.outdir}/cutqc",
         mode: "${params.publish_dir_mode}",
-        enabled: params.outdir as boolean
+        enabled: params.outdir as boolean,
+        saveAs: { filename ->
+        if(filename=~/readReport.json/){
+            return filename
+        }else{
+            return null
+        }
+    }
     // conda (params.enable_conda ? "conda-forge::sed=4.7" : null)
     // if (workflow.containerEngine == 'singularity' && !params.singularity_pull_docker_container) {
     //     container "https://containers.biocontainers.pro/s3/SingImgsRepo/biocontainers/v1.2.0_cv1/biocontainers_v1.2.0_cv1.img"
