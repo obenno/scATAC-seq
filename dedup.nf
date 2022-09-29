@@ -17,9 +17,12 @@ process DEDUP {
     script:
     """
     ## Mark duplicates
+    export TMPDIR="./"
     sortedBAM=\$(mktemp -p ./ sorted.XXXXXX.bam)
     samtools sort -@ $task.cpus ${inputBam} > \$sortedBAM
+    mkdir picard_tmp
     picard MarkDuplicates \\
+        TMP_DIR=\$(pwd)/picard_tmp \\
         INPUT=\$sortedBAM OUTPUT=${sampleID}.mark_dup.bam METRICS_FILE=${sampleID}.mark_dup.metrics \\
         VALIDATION_STRINGENCY=LENIENT ASSUME_SORT_ORDER=coordinate
     ## Filter alignments (remove duplicates)

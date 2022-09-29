@@ -15,6 +15,8 @@ params:
   refGenome: "hg38"
   genomeSize: NULL
   macs2: NULL
+  minCell: 10
+  minFeature: 200
   nCount_min: 3000
   nCount_max: 20000
   FRiP_cutoff: 0.15
@@ -116,8 +118,8 @@ chrom_assay <- CreateChromatinAssay(
   sep = c(":", "-"),
   genome = params$refGenome,
   fragments = params$fragmentFile,
-  min.cells = 10,
-  min.features = 200
+  min.cells = as.numeric(params$minCell),
+  min.features = as.numeric(params$minFeature)
 )
 
 scATAC_obj <- CreateSeuratObject(

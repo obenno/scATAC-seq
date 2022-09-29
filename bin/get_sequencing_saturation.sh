@@ -46,6 +46,9 @@ then
     exit 1
 fi
 
+## Set TMPDIR to local dir
+export TMPDIR="./"
+
 function calc_saturation {
     local subsampledBAM=$(mktemp -p ./ subsampled.XXXXXXXX.bam)
     local subsampledFragment=$(mktemp -p ./ frag.XXXXXXXX.bed)

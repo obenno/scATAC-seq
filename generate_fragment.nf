@@ -16,6 +16,7 @@ process GENERATE_FRAGMENTS {
 
     script:
     """
+    export TMPDIR="./"
     sinto fragments -b $bamFile -p $task.cpus -f ${sampleID}.fragments.bed --barcode_regex "[^:]*"
     sort -k1,1 -k2,2n ${sampleID}.fragments.bed > ${sampleID}.fragments.sorted.bed
     bgzip -@ $task.cpus ${sampleID}.fragments.sorted.bed

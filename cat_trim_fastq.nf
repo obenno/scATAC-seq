@@ -25,7 +25,7 @@ process CAT_TRIM_FASTQ {
     output:
     tuple val(sampleID), val(sampleName), path("*_1.trimmed.fq.gz"), emit: read1
     tuple val(sampleID), val(sampleName), path("*_2.trimmed.fq.gz"), emit: read2
-    tuple val(sampleID), val(sampleName), path("*_1.merged.bc.fq.gz"), emit: read_bc
+    //tuple val(sampleID), val(sampleName), path("*_1.merged.bc.fq.gz"), emit: read_bc
     tuple val(sampleID), val(sampleName), path("${sampleID}.readReport.json"), emit: readReport
     //tuple val(sampleID), val(sampleName), path("*.read_stat.txt"), emit: report
     //tuple val(sampleID), val(sampleName), path("*_cutqc_report.html"), emit: cutqc_report
@@ -39,13 +39,13 @@ process CAT_TRIM_FASTQ {
     cat ${read1.sort().join(' ')} > ${prefix}_1.merged.fq.gz
     cat ${read2.sort().join(' ')} > ${prefix}_2.merged.fq.gz
 
-    split_barcode_reads.sh ${prefix}_1.merged.fq.gz $params.bcReadLen
+    ##split_barcode_reads.sh ${prefix}_1.merged.fq.gz $params.bcReadLen
 
     ## use bash script instead, will be much faster but require more memory
     ##sinto barcode -b $params.bcLen --barcode_fastq ${prefix}_1.merged.bc.fq.gz \\
     ##--read1 ${prefix}_1.merged.cDNA_R1.fq.gz \\
     ##--read2 ${prefix}_2.merged.fq.gz
-    add_barcode_to_reads.sh ${sampleID} ${whitelist} $params.bcLen ${prefix}_1.merged.bc.fq.gz ${prefix}_1.merged.cDNA_R1.fq.gz ${prefix}_2.merged.fq.gz > ${sampleID}.readReport.json
+    add_barcode_to_reads.sh ${sampleID} ${whitelist} $params.bcReadLen $params.bcLen ${prefix}_1.merged.fq.gz ${prefix}_2.merged.fq.gz ${task.cpus} > ${sampleID}.readReport.json
 
     ## rename sinto output to fq.gz
     ##mv ${prefix}_1.merged.cDNA_R1.barcoded.fastq.gz ${prefix}_1.merged.cDNA_R1.barcoded.fq.gz
@@ -63,6 +63,6 @@ process CAT_TRIM_FASTQ {
 
     ## cutadapt QC and trim ME adapter
     cutadapt -j $task.cpus -q 30 -m $params.trimLength $params.trimOpt -o ${prefix}_1.trimmed.fq.gz -p ${prefix}_2.trimmed.fq.gz \\
-    ${prefix}_1.merged.cDNA_R1.barcoded.fq.gz ${prefix}_2.merged.barcoded.fq.gz
+    ${prefix}_1.merged.barcoded.fq.gz ${prefix}_2.merged.barcoded.fq.gz
     """
 }
