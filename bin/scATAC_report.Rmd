@@ -308,10 +308,11 @@ Row {data-height=500}
 
 fig <- plot_ly(data = d, x = ~idx, y = ~counts, type = 'scatter', mode = 'markers',
                color = ~type, colors = c('grey', '#002366'),
-               hovertemplate = 'Fragments: %{y}<extra>%{fullData.name}</extra>')
-               ##line = list(width = 3))
+               hovertemplate = 'Fragments: %{y}<extra>%{fullData.name}</extra>',
+               line = list(width = 3),
+               height = 400, width = 360)
 fig <- layout(fig, xaxis = list(type = "log", title = "Barcodes"), 
-              yaxis = list(type = "log", title = "Fragments"), showlegend = FALSE)
+              yaxis = list(type = "log", title = "Fragments in Peaks"), showlegend = FALSE)
 config_plotly_fig(fig) %>% toWebGL()
 ```
 
@@ -527,4 +528,11 @@ ggplot(k, aes(x=fragments, y=FRiP, color=group))+geom_point(alpha=0.8)+scale_x_l
     theme_bw() + scale_color_manual(values=c("grey", "steelblue")) + ylim(0,1) +
     theme(legend.title=element_blank(), panel.grid=element_blank())
 ##ggplotly(p) %>% toWebGL()
+```
+
+```{js}
+// set knee plot margin to auto
+$( document ).ready(function() {
+    document.querySelector(".plot-container").querySelector(".svg-container").style.margin = "auto";
+});
 ```
