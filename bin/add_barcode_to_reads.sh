@@ -56,8 +56,10 @@ paste -d "\t" $read1_temp $read2_temp |
     ARGIND==2{
         split($1, tmp1, " ")
         read1_id=tmp1[1]
+        sub("/(1|2)$", "", read1_id)
         split($5, tmp2, " ")
         read2_id=tmp2[1]
+        sub("/(1|2)$", "", read2_id)
         if(read1_id!=read2_id){
             print "R1 and R2 are not concordant, please check fastq input files." > "/dev/stderr"
             exit 1
