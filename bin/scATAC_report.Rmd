@@ -9,7 +9,8 @@ output:
       version: 5
       bootswatch: sandstone
 params:
-  cpus: 6
+  nCPUs: 6
+  nMem: 10000000000.0
   sampleName: ""
   fragmentFile: ""
   refGenome: "hg38"
@@ -45,8 +46,10 @@ library(plotly)
 library(jsonlite)
 
 set.seed(1234)
-plan("multisession", workers = as.numeric(params$cpus))
-options(future.globals.maxSize = 10 * 1024 ^ 3) # for 10 Gb RAM
+plan("multisession", workers = as.numeric(params$nCPUs))
+options(future.globals.maxSize = as.numeric(params$nMem))
+RhpcBLASctl::blas_set_num_threads(1) # https://github.com/satijalab/seurat/issues/3991
+
 
 ## Rmd options
 knitr::opts_chunk$set(
