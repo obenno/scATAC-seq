@@ -11,9 +11,10 @@ output:
 params:
   nCPUs: 6
   nMem: 10000000000.0
-  sampleName: ""
-  fragmentFile: ""
+  sampleName: NULL
+  fragmentFile: NULL
   refGenome: "hg38"
+  refGTF: NULL
   genomeSize: NULL
   macs2: NULL
   minCell: 10
@@ -38,8 +39,9 @@ library(kableExtra)
 library(flexdashboard)
 library(Signac)
 library(Seurat)
-library(GenomeInfoDb)
-library(EnsDb.Mmusculus.v79)
+##library(GenomeInfoDb)
+##library(EnsDb.Mmusculus.v79)
+library(rtracklayer)
 library(patchwork)
 library(future)
 library(plotly)
@@ -77,30 +79,40 @@ config_plotly_fig <- function(fig){
 
 
 ```{r include=FALSE}
+## Read gene annotation from GTF
+annotations <- import(params$refGTF)
+annotations$gene_biotype <- annotations$gene_type
+## Filter annotations by gene_biotype
+annotations <- annotations[annotations$gene_biotype %in% c("protein_coding", "lincRNA", "rRNA", "processed_transcript")]
+
 if(params$refGenome == "hg38"){
-    library(EnsDb.Hsapiens.v86)
-    ensdb = EnsDb.Hsapiens.v86
+    ##library(EnsDb.Hsapiens.v86)
+    ##ensdb = EnsDb.Hsapiens.v86
     genomeSize = 2.7e9
     blackListObj = blacklist_hg38_unified
 }else if(params$refGenome == "hg19"){
-    library(EnsDb.Hsapiens.v75)
-    ensdb = EnsDb.Hsapiens.v75
+    ##library(EnsDb.Hsapiens.v75)
+    ##ensdb = EnsDb.Hsapiens.v75
     genomeSize = 2.7e9
     blackListObj = blacklist_hg19
-##}else if(params$refGenome == "mm9"){
-##    library(EnsDb.Mmusculus.v75)
-##    ensdb = EnsDb.Mmusculus.v75
-##    genomeSize = 1.87e9
-##    blackListObj = blacklist_mm9
+}else if(params$refGenome == "mm9"){
+    genomeSize = 1.87e9
+    blackListObj = blacklist_mm9
 }else if(params$refGenome == "mm10"){
-    library(EnsDb.Mmusculus.v79)
-    ensdb = EnsDb.Mmusculus.v79
+    ##library(EnsDb.Mmusculus.v79)
+    ##ensdb = EnsDb.Mmusculus.v79
     genomeSize = 1.87e9
     blackListObj = blacklist_mm10
+
+}else if(params$refGenome == "hg38-mm10"){
+    genomeSize = 2.7e9+1.87e9
+    seqlevels(blacklist_hg38_unified) <- paste0("GRCh38_", seqlevels(blacklist_hg38_unified))
+    seqlevels(blacklist_mm10) <- paste0("mm10___", seqlevels(blacklist_mm10))
+    blackListObj = c(blacklist_hg38_unified, blacklist_mm10)
 }else{
     ## default load hg38
-    library(EnsDb.Hsapiens.v86)
-    ensdb = EnsDb.Hsapiens.v86
+    ##library(EnsDb.Hsapiens.v86)
+    ##ensdb = EnsDb.Hsapiens.v86
     genomeSize = 2.7e9
     blackListObj = blacklist_hg38_unified
 }
@@ -130,8 +142,8 @@ scATAC_obj <- CreateSeuratObject(
   assay = "peaks"
 )
 
-annotations <- GetGRangesFromEnsDb(ensdb = ensdb)
-seqlevelsStyle(annotations) <- 'UCSC'
+##annotations <- GetGRangesFromEnsDb(ensdb = ensdb)
+##seqlevelsStyle(annotations) <- 'UCSC'
 Annotation(scATAC_obj) <- annotations
 
 # compute nucleosome signal score per cell
@@ -144,7 +156,8 @@ scATAC_obj$high.tss <- ifelse(scATAC_obj$TSS.enrichment > as.numeric(params$TSS_
 tssPlot <- TSSPlot(scATAC_obj, group.by = 'high.tss') + NoLegend()
 
 scATAC_obj$nucleosome_group <- ifelse(scATAC_obj$nucleosome_signal > as.numeric(params$nucleosome_signal_cutoff), paste0('NS > ', params$nucleosome_signal_cutoff), paste0('NS < ', params$nucleosome_signal_cutoff))
-fragLenPlot <- FragmentHistogram(object = scATAC_obj, group.by = 'nucleosome_group', region='chr1-1-200000000')
+
+fragLenPlot <- FragmentHistogram(object = scATAC_obj, group.by = 'nucleosome_group', region=paste0(seqlevels(annotations)[1],'-1-200000000'))
 
 ## Calculate fragments in peaks for each cell
 total_fragments <- CountFragments(params$fragmentFile) %>%
@@ -232,14 +245,14 @@ Row
 valueBox(scales::label_comma()(length(cells)), caption = "Estimated number of cells", icon="fa-circle-notch", color="primary")
 ```
 
-### Estimated Number of Cells
+### Median of Total Fragments in Cells
 
 ```{r}
 cellFrag_median <- scATAC_obj[["fragments"]] %>% pull(fragments) %>% median() %>% as.integer()
 valueBox(scales::label_comma()(cellFrag_median), caption = "Median fragments per cell", icon="fa-chart-bar", color="danger")
 ```
 
-### Estimated Number of Cells
+### Median FRiP of Cells
 
 ```{r}
 cellFRiP_median <- scATAC_obj[["FRiP"]] %>% pull(FRiP) %>% median()
@@ -263,8 +276,7 @@ tribble(
   "Median of FRiP in cells", scales::label_percent(0.01)(cellFRiP_median),
   ##"Fraction of transposition events in peaks in cells", "100",
 ) %>% kbl() %>% kable_paper("hover", html_font = "arial, helvetica, sans-serif") %>%
-  column_spec(1, bold = T) %>%
-  footnote(number = c("FRiP: fraction of fragments overlapping peaks"))
+  column_spec(1, bold = T)
 ```
 
 ### Sequencing
@@ -283,11 +295,14 @@ if(!is.null(params$readReport)){
   )
 }
 
+validBarcode_rate <- as.numeric(readReport$validBarcode_readCount)/as.numeric(readReport$rawReadPairs)
+validBarcode_rate <- scales::label_percent(0.01)(validBarcode_rate)
+
 tribble(
   ~"", ~"",
   "Raw read pairs", scales::label_comma()(as.numeric(readReport$rawReadPairs)),
   "Valid barcodes", scales::label_comma()(as.numeric(readReport$validBarcode_count)),
-  "Read pairs with valid barcode", scales::label_comma()(as.numeric(readReport$validBarcode_readCount)),
+  "Read pairs with valid barcode", paste0(scales::label_comma()(as.numeric(readReport$validBarcode_readCount)), " (", validBarcode_rate,")"),
   "Q30 bases in barcodes", readReport$Q30_bcRead,
   "Q30 bases in read 1", readReport$Q30_read1,
   "Q30 bases in read 2", readReport$Q30_read2
@@ -309,7 +324,7 @@ Row {data-height=500}
 ##          legend.position = "none")
 ##kneePlot + xlab("Barcode") + ylab("Fragments")
 
-fig <- plot_ly(data = d, x = ~idx, y = ~counts, type = 'scatter', mode = 'markers',
+fig <- plot_ly(data = d, x = ~idx, y = ~counts, type = 'scatter', mode = 'lines',
                color = ~type, colors = c('grey', '#002366'),
                hovertemplate = 'Fragments: %{y}<extra>%{fullData.name}</extra>',
                line = list(width = 3),
@@ -538,4 +553,39 @@ ggplot(k, aes(x=fragments, y=FRiP, color=group))+geom_point(alpha=0.8)+scale_x_l
 $( document ).ready(function() {
     document.querySelector(".plot-container").querySelector(".svg-container").style.margin = "auto";
 });
+```
+
+
+```{r include=FALSE}
+## gather metrics and write metrics json file
+## metrics includes:
+## cellNumber
+## mean fragments per cell
+## median fragments per cell
+## mean FRiP per cell
+## median FRiP per cell
+## raw Reads
+## valid barcode ratio
+## Q30 in barcode
+## Q30 in read1
+## Q30 in read2
+## NRF
+## PBC1
+## PBC2
+## Duplication ratio
+## total fragments
+## total reads of fragments
+
+##metrics_tbl <- tribble(
+##  ~"term", ~"value",
+##  "sample", params$sampleName,
+##  "Number of Raw Reads", readReport$rawReadPairs,
+##  "Reads with Valid Barcodes", validBarcode_rate,
+##  "Q30 Bases in Barcodes", readReport$Q30_bcRead,
+##  "Q30 Bases in Read 1", readReport$Q30_read1,
+##  "Q30 Bases in Read 2", readReport$Q30_read2,
+##  "Total Mapping Rate", ,
+##  "Uniquely Mapping Rate", ,
+##  
+##)
 ```
