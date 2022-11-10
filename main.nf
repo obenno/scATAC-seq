@@ -89,6 +89,7 @@ workflow {
         LIBRARY_COMPLEXITY.out.libraryComplexity,
         CHECK_SATURATION.out.outJSON,
         GENERATE_FRAGMENTS.out.fragmentFile,
-        GENERATE_FRAGMENTS.out.fragmentIndex
+        GENERATE_FRAGMENTS.out.fragmentIndex,
+        ch_genomeGTF
     )
 }

@@ -15,9 +15,17 @@ process GENERATE_FRAGMENTS {
     //path "versions.yml"                       , emit: versions
 
     script:
+    // sinto fragments by default only recognize "chr" pattern in bam file
+    if(params.refGenome == "hg38" || params.refGenome == "hg38"){
+        chr_pattern = '(?i)^chr'
+    }else if(params.refGenome == "hg38-mm10"){
+        chr_pattern = '(?i)(^GRCh38_chr|^mm10___chr)'
+    }else{
+        chr_pattern = params.chrPattern
+    }
     """
     export TMPDIR="./"
-    sinto fragments -b $bamFile -p $task.cpus -f ${sampleID}.fragments.bed --barcode_regex "[^:]*"
+    sinto fragments -b $bamFile -p $task.cpus -f ${sampleID}.fragments.bed --barcode_regex "[^:]*" --use_chrom "${chr_pattern}"
     sort -k1,1 -k2,2n ${sampleID}.fragments.bed > ${sampleID}.fragments.sorted.bed
     bgzip -@ $task.cpus ${sampleID}.fragments.sorted.bed
     tabix -p bed ${sampleID}.fragments.sorted.bed.gz
