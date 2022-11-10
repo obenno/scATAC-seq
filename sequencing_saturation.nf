@@ -9,8 +9,16 @@ process CHECK_SATURATION {
     output:
     tuple val(sampleID), val(sampleName), path("${sampleID}.saturation_out.json"), emit: outJSON
 
-    shell:
+    script:
+    // sinto fragments by default only recognize "chr" pattern in bam file
+    if(params.refGenome == "hg38" || params.refGenome == "mm10"){
+        chr_pattern = '(?i)^chr'
+    }else if(params.refGenome == "hg38-mm10"){
+        chr_pattern = '(?i)(^GRCh38_chr|^mm10___chr)'
+    }else{
+        chr_pattern = params.chrPattern
+    }
     """
-    get_sequencing_saturation.sh $inputBam $task.cpus ${sampleID}.saturation_out.json
+    get_sequencing_saturation.sh $inputBam "$chr_pattern" $task.cpus ${sampleID}.saturation_out.json
     """
 }

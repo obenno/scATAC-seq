@@ -17,7 +17,7 @@ set -euo pipefail
 ##refGenome: hg38, hg19, mm10 or mm9
 ##"
 
-usage="Usage: $(basename $0) inputBAM thread outputJSON"
+usage="Usage: $(basename $0) inputBAM chrPattern thread outputJSON"
 
 if [[ $# -eq 0 ]] || [[ $1 == "-h" ]] || [[ $1 == "-help" ]] || [[ $1 == "--help" ]]
 then
@@ -26,9 +26,10 @@ then
 fi
 
 inputBAM=$1
-thread=$2
+chrPattern=$2
+thread=$3
 ##refGenome=$3
-outputJSON=$3
+outputJSON=$4
 
 ##if [[ -z $refGenome ]]
 ##then
@@ -59,7 +60,7 @@ function calc_saturation {
     samtools view -@ $thread -u --subsample $percentage --subsample-seed 1324 $inputBAM |
         samtools sort -@ $thread > $subsampledBAM
     samtools index $subsampledBAM
-    sinto fragments -b $subsampledBAM -p $thread -f $subsampledFragment --barcode_regex "[^:]*" ##--collapse_within
+    sinto fragments -b $subsampledBAM -p $thread -f $subsampledFragment --barcode_regex "[^:]*" --use_chrom "$chrPattern" ##--collapse_within
     seqDep=$(awk '{n+=$5}END{print n}' $subsampledFragment)
     uniqueFrag=$(wc -l $subsampledFragment | awk '{print $1}')
     ##sort -k1,1 -k2,2n $subsampledFragment | bgzip -@ $thread -c > $subsampledFragment".gz"
