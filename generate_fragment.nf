@@ -16,7 +16,7 @@ process GENERATE_FRAGMENTS {
 
     script:
     // sinto fragments by default only recognize "chr" pattern in bam file
-    if(params.refGenome == "hg38" || params.refGenome == "hg38"){
+    if(params.refGenome == "hg38" || params.refGenome == "mm10"){
         chr_pattern = '(?i)^chr'
     }else if(params.refGenome == "hg38-mm10"){
         chr_pattern = '(?i)(^GRCh38_chr|^mm10___chr)'
