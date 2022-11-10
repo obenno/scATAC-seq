@@ -131,7 +131,7 @@ counts <- FeatureMatrix(fragments = frag, features = macs_peaks,
 chrom_assay <- CreateChromatinAssay(
   counts = counts,
   sep = c(":", "-"),
-  genome = params$refGenome,
+  ##genome = params$refGenome,
   fragments = params$fragmentFile,
   min.cells = as.numeric(params$minCell),
   min.features = as.numeric(params$minFeature)
@@ -454,7 +454,7 @@ if(!is.null(params$bowtie2_report)){
 }
 frag_tibble <- read_tsv(params$fragmentFile, col_names = c("chr", "start", "end", "barcode", "count"))
 totalFrag <- frag_tibble %>% dplyr::pull(count) %>% sum()
-mito_counts <- frag_tibble %>% dplyr::filter(chr=="chrM") %>% dplyr::pull(count) %>% sum()
+mito_counts <- frag_tibble %>% dplyr::filter(str_detect(chr, "chrM")) %>% dplyr::pull(count) %>% sum()
 nfr_counts <- frag_tibble %>% dplyr::filter(end-start<=147) %>% dplyr::pull(count) %>% sum()
 monoNucleosome_counts <- frag_tibble %>% dplyr::filter(end-start>147, end-start<=294) %>% dplyr::pull(count) %>% sum()
 tribble(
@@ -508,7 +508,7 @@ tssPlot %>% ggplotly() %>% config_plotly_fig() %>% toWebGL()
 chrom_assay_raw <- CreateChromatinAssay(
   counts = counts,
   sep = c(":", "-"),
-  genome = params$refGenome,
+  ##genome = params$refGenome,
   fragments = params$fragmentFile,
   min.cells = 0,
   min.features = 0
