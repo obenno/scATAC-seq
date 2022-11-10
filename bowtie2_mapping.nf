@@ -19,7 +19,7 @@ process BOWTIE2 {
 
     script:
     def prefix     = "${sampleID}"
-    def genomeIndex = index.collect{ it.toString() }[0].replaceFirst(/(\.rev)*\.(\d+)\.bt2$/, "")
+    def genomeIndex = index.collect{ it.toString() }[0].replaceFirst(/(\.rev)*\.(\d+)\.bt2(l)*$/, "")
     //def barcodeMate = params.bc_read == "fastq_1" ? 1 : 2
     // support pair-end only for now
     //sample.single_end = false
