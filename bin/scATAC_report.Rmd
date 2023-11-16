@@ -6,7 +6,7 @@ output:
     vertical_layout: scroll
     orientation: rows
     theme:
-      version: 5
+      version: 4
       bootswatch: sandstone
 params:
   nCPUs: 6
@@ -77,6 +77,12 @@ config_plotly_fig <- function(fig){
 }
 ```
 
+```{js echo=FALSE}
+document.querySelector(".navbar").classList.remove("navbar-inverse");
+document.querySelector(".navbar").classList.add("navbar-default");
+document.querySelector(".navbar").classList.add("pt-1");
+document.querySelector(".navbar").classList.add("pb-1");
+```
 
 ```{r include=FALSE}
 ## Read gene annotation from GTF
@@ -118,7 +124,7 @@ if(params$refGenome == "hg38"){
 }
 
 ## overwrite genomeSize with input parameter
-if(!is.null(params$genomeSize)){
+if(!is.null(params$genomeSize) && params$genomeSize !=""){
     genomeSize = params$genomeSize
 }
 
@@ -141,6 +147,8 @@ scATAC_obj <- CreateSeuratObject(
   counts = chrom_assay,
   assay = "peaks"
 )
+
+scATAC_obj$orig.ident <- params$sampleName
 
 ##annotations <- GetGRangesFromEnsDb(ensdb = ensdb)
 ##seqlevelsStyle(annotations) <- 'UCSC'
@@ -186,7 +194,8 @@ qcPlot <- VlnPlot(
   features = c('FRiP', 'nCount_peaks',
                'TSS.enrichment', 'blacklist_fraction', 'nucleosome_signal'),
   pt.size = 0.1,
-  ncol = 5
+  ncol = 5,
+  group.by = "orig.ident"
 )
 
 ## Filter data with naive criteria
@@ -287,9 +296,7 @@ if(!is.null(params$readReport)){
 }else{
   readReport <- list(
     "rawReadPairs"=NULL,
-    "validBarcode_count"=NULL,
-    "validBarcode_readCount"=NULL,
-    "Q30_bcRead"=NULL,
+    "validBarcode_ratio"=NULL,
     "Q30_read1"=NULL,
     "Q30_read2"=NULL
   )
@@ -301,9 +308,7 @@ validBarcode_rate <- scales::label_percent(0.01)(validBarcode_rate)
 tribble(
   ~"", ~"",
   "Raw read pairs", scales::label_comma()(as.numeric(readReport$rawReadPairs)),
-  "Valid barcodes", scales::label_comma()(as.numeric(readReport$validBarcode_count)),
-  "Read pairs with valid barcode", paste0(scales::label_comma()(as.numeric(readReport$validBarcode_readCount)), " (", validBarcode_rate,")"),
-  "Q30 bases in barcodes", readReport$Q30_bcRead,
+  "Valid barcodes", scales::label_percent()(as.numeric(readReport$validBarcode_ratio)),
   "Q30 bases in read 1", readReport$Q30_read1,
   "Q30 bases in read 2", readReport$Q30_read2
 ) %>% kbl() %>% kable_paper("hover", html_font = "arial, helvetica, sans-serif") %>%

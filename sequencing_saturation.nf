@@ -3,11 +3,11 @@ process CHECK_SATURATION {
     label 'process_high'
 
     input:
-    tuple val(sampleID), val(sampleName), path(inputBam)
-    tuple val(sampleID), val(sampleName), path(inputBamBai)
+    tuple val(sampleID), path(inputBam)
+    tuple val(sampleID), path(inputBamBai)
 
     output:
-    tuple val(sampleID), val(sampleName), path("${sampleID}.saturation_out.json"), emit: outJSON
+    tuple val(sampleID), path("${sampleID}.saturation_out.json"), emit: outJSON
 
     script:
     // sinto fragments by default only recognize "chr" pattern in bam file

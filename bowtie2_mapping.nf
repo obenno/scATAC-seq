@@ -5,16 +5,16 @@ process BOWTIE2 {
         mode: "${params.publish_dir_mode}",
         enabled: params.outdir as boolean
     input:
-    tuple val(sampleID), val(sampleName), path(read1)
-    tuple val(sampleID), val(sampleName), path(read2)
+    tuple val(sampleID), path(read1)
+    tuple val(sampleID), path(read2)
     path index
     //path gtf
     //path whitelist
 
     output:
-    tuple val(sampleID), val(sampleName), path("${sampleID}.sorted.bam")       , emit: bam
-    tuple val(sampleID), val(sampleName), path("${sampleID}.sorted.bam.bai")   , emit: bai
-    tuple val(sampleID), val(sampleName), path("${sampleID}.mappingReport.json")   , emit: mappingReport
+    tuple val(sampleID), path("${sampleID}.sorted.bam")           , emit: bam
+    tuple val(sampleID), path("${sampleID}.sorted.bam.bai")       , emit: bai
+    tuple val(sampleID), path("${sampleID}.mappingReport.json")   , emit: mappingReport
     //path "versions.yml"                       , emit: versions
 
     script:

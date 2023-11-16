@@ -5,13 +5,13 @@ process GENERATE_FRAGMENTS {
         mode: "${params.publish_dir_mode}",
         enabled: params.outdir as boolean
     input:
-    tuple val(sampleID), val(sampleName), path(bamFile)
-    tuple val(sampleID), val(sampleName), path(bamIndex)
+    tuple val(sampleID), path(bamFile)
+    tuple val(sampleID), path(bamIndex)
     //path whitelist
 
     output:
-    tuple val(sampleID), val(sampleName), path("${sampleID}.fragments.sorted.bed.gz")       , emit: fragmentFile
-    tuple val(sampleID), val(sampleName), path("${sampleID}.fragments.sorted.bed.gz.tbi")   , emit: fragmentIndex
+    tuple val(sampleID), path("${sampleID}.fragments.sorted.bed.gz")       , emit: fragmentFile
+    tuple val(sampleID), path("${sampleID}.fragments.sorted.bed.gz.tbi")   , emit: fragmentIndex
     //path "versions.yml"                       , emit: versions
 
     script:

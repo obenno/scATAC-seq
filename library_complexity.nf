@@ -4,11 +4,11 @@ process LIBRARY_COMPLEXITY {
     label 'process_low'
 
     input:
-    tuple val(sampleID), val(sampleName), path(inputBam)
-    tuple val(sampleID), val(sampleName), path(inputBamBai)
+    tuple val(sampleID), path(inputBam)
+    tuple val(sampleID), path(inputBamBai)
 
     output:
-    tuple val(sampleID), val(sampleName), path("${sampleID}.libComplexity"), emit: libraryComplexity
+    tuple val(sampleID), path("${sampleID}.libComplexity"), emit: libraryComplexity
 
     shell:
     '''

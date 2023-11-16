@@ -1,0 +1,828 @@
+---
+title: scATAC-seq Report
+date: "`r Sys.Date()`"
+output:
+  flexdashboard::flex_dashboard:
+    vertical_layout: scroll
+    orientation: rows
+    theme:
+      version: 5
+      bootswatch: sandstone
+params:
+  nCPUs: 6
+  nMem: 10000000000.0
+  sampleName: NULL
+  fragmentFile: NULL
+  refGenome: "hg38-mm10"
+  refGTF: NULL
+  genomeSize: NULL
+  macs2: NULL
+  minCell: 10
+  minFeature: 200
+  nCount_min: 3000
+  nCount_max: 20000
+  FRiP_cutoff: 0.15
+  blacklist_fraction_cutoff: 0.05
+  nucleosome_signal_cutoff: 4
+  TSS_enrichment_cutoff: 2
+  readReport: NULL
+  bowtie2_report: NULL
+  saturation_json: NULL
+  libraryComplexity: NULL
+  dupRatio: NULL
+---
+
+```{r include=FALSE}
+library(tidyverse)
+library(scales)
+library(kableExtra)
+library(flexdashboard)
+library(Signac)
+library(Seurat)
+##library(GenomeInfoDb)
+##library(EnsDb.Mmusculus.v79)
+library(rtracklayer)
+library(patchwork)
+library(future)
+library(plotly)
+library(jsonlite)
+
+set.seed(1234)
+plan("multisession", workers = as.numeric(params$nCPUs))
+options(future.globals.maxSize = as.numeric(params$nMem))
+RhpcBLASctl::blas_set_num_threads(1) # https://github.com/satijalab/seurat/issues/3991
+
+
+## Rmd options
+knitr::opts_chunk$set(
+  comment = '', fig.retina = 4,
+  warning = FALSE, message = FALSE
+)
+
+config_plotly_fig <- function(fig){
+    config(
+        fig,
+        displaylogo = FALSE, 
+        modeBarButtonsToRemove = c('zoom', 'pan', 'select', 'zoomIn', 'zoomOut', 'autoScale',
+                                   'hoverClosestCartesian', 'hoverCompareCartesian'),
+        toImageButtonOptions = list(height= NULL, width= NULL, scale= 2)
+    )
+}
+```
+
+```{css echo = FALSE}
+.chart-title {
+  font-size: 1.2rem;
+  font-weight: 700;
+}
+```
+
+
+```{r include=FALSE}
+## Read gene annotation from GTF
+annotations <- import(params$refGTF)
+annotations$gene_biotype <- annotations$gene_type
+## Filter annotations by gene_biotype
+annotations <- annotations[annotations$gene_biotype %in% c("protein_coding", "lincRNA", "rRNA", "processed_transcript")]
+
+if(params$refGenome == "hg38"){
+    ##library(EnsDb.Hsapiens.v86)
+    ##ensdb = EnsDb.Hsapiens.v86
+    genomeSize = 2.7e9
+    blackListObj = blacklist_hg38_unified
+}else if(params$refGenome == "hg19"){
+    ##library(EnsDb.Hsapiens.v75)
+    ##ensdb = EnsDb.Hsapiens.v75
+    genomeSize = 2.7e9
+    blackListObj = blacklist_hg19
+}else if(params$refGenome == "mm9"){
+    genomeSize = 1.87e9
+    blackListObj = blacklist_mm9
+}else if(params$refGenome == "mm10"){
+    ##library(EnsDb.Mmusculus.v79)
+    ##ensdb = EnsDb.Mmusculus.v79
+    genomeSize = 1.87e9
+    blackListObj = blacklist_mm10
+
+}else if(params$refGenome == "hg38-mm10"){
+    genomeSize = 2.7e9+1.87e9
+    seqlevels(blacklist_hg38_unified) <- paste0("GRCh38_", seqlevels(blacklist_hg38_unified))
+    seqlevels(blacklist_mm10) <- paste0("mm10___", seqlevels(blacklist_mm10))
+    blackListObj = c(blacklist_hg38_unified, blacklist_mm10)
+}else{
+    ## default load hg38
+    ##library(EnsDb.Hsapiens.v86)
+    ##ensdb = EnsDb.Hsapiens.v86
+    genomeSize = 2.7e9
+    blackListObj = blacklist_hg38_unified
+}
+
+## overwrite genomeSize with input parameter
+if(!is.null(params$genomeSize) && params$genomeSize != ""){
+    genomeSize = params$genomeSize
+}
+
+## Perform analysis
+frag <- CreateFragmentObject(params$fragmentFile)
+macs_peaks <- CallPeaks(frag, macs2.path = params$macs2, effective.genome.size = genomeSize)
+counts <- FeatureMatrix(fragments = frag, features = macs_peaks, 
+                        sep= c(":", "-"))
+
+## Generate data for knee and barnyard plot, full dataset including background barcodes
+chrom_assay <- CreateChromatinAssay(
+  counts = counts,
+  sep = c(":", "-"),
+  fragments = params$fragmentFile,
+  min.cells = 0, 
+  min.features = 0
+)
+
+scATAC_obj <- CreateSeuratObject(
+  counts = chrom_assay,
+  assay = "peaks"
+)
+
+Annotation(scATAC_obj) <- annotations
+
+## TSS enrichment and insert size were evaluated with full dataset
+
+# compute TSS enrichment score per cell
+scATAC_obj <- TSSEnrichment(object = scATAC_obj, fast = FALSE)
+
+scATAC_obj$high.tss <- ifelse(scATAC_obj$TSS.enrichment > as.numeric(params$TSS_enrichment_cutoff), 'High', 'Low')
+tssPlot <- TSSPlot(scATAC_obj, group.by = 'high.tss') + NoLegend()
+
+# compute nucleosome signal score per cell
+scATAC_obj <- NucleosomeSignal(object = scATAC_obj)
+
+scATAC_obj$nucleosome_group <- ifelse(scATAC_obj$nucleosome_signal > as.numeric(params$nucleosome_signal_cutoff), paste0('NS > ', params$nucleosome_signal_cutoff), paste0('NS < ', params$nucleosome_signal_cutoff))
+
+fragLenPlot <- FragmentHistogram(object = scATAC_obj, group.by = 'nucleosome_group', region=paste0(seqlevels(annotations)[1],'-1-200000000'))
+
+## Calculate fragments in peaks for each cell
+total_fragments <- CountFragments(params$fragmentFile) %>%
+    dplyr::filter(CB %in% colnames(scATAC_obj)) %>% 
+    dplyr::select(CB, frequency_count)
+
+scATAC_obj@meta.data <- scATAC_obj@meta.data %>%
+    rownames_to_column("CB") %>%
+    left_join(total_fragments, by="CB") %>%
+    dplyr::rename("fragments" = frequency_count) %>%
+    column_to_rownames("CB")
+
+scATAC_obj <- FRiP(
+  object = scATAC_obj,
+  assay = 'peaks',
+  total.fragments = 'fragments'
+)
+
+scATAC_obj$blacklist_fraction <- FractionCountsInRegion(
+  object = scATAC_obj,
+  assay = 'peaks',
+  regions = blackListObj
+)
+
+## Calculate counts for each reference respectively
+allPeaks <- rownames(scATAC_obj)
+humanPeaks <- allPeaks[str_detect(allPeaks, "^GRCh38")]
+mousePeaks <- allPeaks[str_detect(allPeaks, "^mm10")]
+nCount_peaks_human <- GetAssayData(scATAC_obj, slot = "counts")[humanPeaks,] %>% colSums
+nCount_peaks_mouse <- GetAssayData(scATAC_obj, slot = "counts")[mousePeaks,] %>% colSums
+nFeature_peaks_human <- colSums(GetAssayData(scATAC_obj, slot = "counts")[humanPeaks,] > 0)
+nFeature_peaks_mouse <- colSums(GetAssayData(scATAC_obj, slot = "counts")[mousePeaks,] > 0)
+## Add meta data
+scATAC_obj <- AddMetaData(object = scATAC_obj,
+                          metadata = nCount_peaks_human,
+                          col.name = "nCount_peaks_human")
+scATAC_obj <- AddMetaData(object = scATAC_obj,
+                          metadata = nCount_peaks_mouse,
+                          col.name = "nCount_peaks_mouse")
+scATAC_obj <- AddMetaData(object = scATAC_obj,
+                          metadata = nFeature_peaks_human,
+                          col.name = "nFeature_peaks_human")
+scATAC_obj <- AddMetaData(object = scATAC_obj,
+                          metadata = nFeature_peaks_mouse,
+                          col.name = "nFeature_peaks_mouse")
+
+## Add mito total fragments
+##scATAC_obj <- AddMetaData(object = scATAC_obj,
+##                          metadata = rownames(scATAC_obj@meta.data),
+##                          col.name = "barcodes")
+##
+##cmd <- paste0('zcat ', params$fragmentFile, ' | awk \'$1=="GRCh38_chrM"{print $4}\' | sort | uniq -c | awk \'{print $2"\t"$1}\'')
+##k <- system(cmd, intern  = TRUE)
+##hg38_mito <- data.frame("barcodes" = 1:length(k), "mito_fragments_human" = 1:length(k))
+##for(i in 1:length(k)){
+##    t <- unlist(strsplit(k[i], "\t")); 
+##    hg38_mito$barcodes[i] <- t[1]; 
+##    hg38_mito$mito_fragments_human[i] <- t[2]
+##}
+##cmd <- paste0('zcat ', params$fragmentFile, ' | awk \'$1=="mm10___chrM"{print $4}\' | sort | uniq -c | awk \'{print $2"\t"$1}\'')
+##k <- system(cmd, intern  = TRUE)
+##mm10_mito <- data.frame("barcodes" = 1:length(k), "mito_fragments_mouse" = 1:length(k))
+##for(i in 1:length(k)){
+##    t <- unlist(strsplit(k[i], "\t")); 
+##    mm10_mito$barcodes[i] <- t[1]; 
+##    mm10_mito$mito_fragments_mouse[i] <- t[2]
+##}
+##scATAC_obj@meta.data <- scATAC_obj@meta.data %>%
+##    left_join(hg38_mito, by = "barcodes") %>%
+##    left_join(mm10_mito, by = "barcodes")
+##
+##scATAC_obj@meta.data$mito_fragments_human[is.na(scATAC_obj@meta.data$mito_fragments_human)] <- 0
+##scATAC_obj@meta.data$mito_fragments_mouse[is.na(scATAC_obj@meta.data$mito_fragments_mouse)] <- 0
+##
+##rownames(scATAC_obj@meta.data) <- scATAC_obj@meta.data$barcodes
+
+## Filter data with naive criteria
+cells <- scATAC_obj@meta.data %>%
+    dplyr::filter(nCount_peaks > as.numeric(params$nCount_min),
+           nCount_peaks < as.numeric(params$nCount_max),
+           FRiP > as.numeric(params$FRiP_cutoff),
+           blacklist_fraction < as.numeric(params$blacklist_fraction_cutoff),
+           nucleosome_signal < as.numeric(params$nucleosome_signal_cutoff),
+           TSS.enrichment > as.numeric(params$TSS_enrichment_cutoff)) %>%
+    rownames()
+
+## Recreate object with minCell and minFeature filter
+chrom_assay <- CreateChromatinAssay(
+  counts = counts,
+  sep = c(":", "-"),
+  fragments = params$fragmentFile,
+  min.cells = params$minCell,
+  min.features = params$minFeature
+)
+
+scATAC_cellObj <- CreateSeuratObject(
+  counts = chrom_assay,
+  assay = "peaks"
+)
+
+scATAC_cellObj <- subset(scATAC_cellObj, cells = cells)
+
+Annotation(scATAC_cellObj) <- annotations
+
+## Calculate fragments in peaks for each cell
+total_fragments <- CountFragments(params$fragmentFile) %>%
+    dplyr::filter(CB %in% colnames(scATAC_cellObj)) %>% 
+    dplyr::select(CB, frequency_count)
+
+scATAC_cellObj@meta.data <- scATAC_cellObj@meta.data %>%
+    rownames_to_column("CB") %>%
+    left_join(total_fragments, by="CB") %>%
+    dplyr::rename("fragments" = frequency_count) %>%
+    column_to_rownames("CB")
+
+scATAC_cellObj <- FRiP(
+  object = scATAC_cellObj,
+  assay = 'peaks',
+  total.fragments = 'fragments'
+)
+
+scATAC_cellObj$blacklist_fraction <- FractionCountsInRegion(
+  object = scATAC_cellObj,
+  assay = 'peaks',
+  regions = blackListObj
+)
+
+allPeaks <- rownames(scATAC_cellObj)
+humanPeaks <- allPeaks[str_detect(allPeaks, "^GRCh38")]
+mousePeaks <- allPeaks[str_detect(allPeaks, "^mm10")]
+nCount_peaks_human <- GetAssayData(scATAC_cellObj, slot = "counts")[humanPeaks,] %>% colSums
+nCount_peaks_mouse <- GetAssayData(scATAC_cellObj, slot = "counts")[mousePeaks,] %>% colSums
+nFeature_peaks_human <- colSums(GetAssayData(scATAC_cellObj, slot = "counts")[humanPeaks,] > 0)
+nFeature_peaks_mouse <- colSums(GetAssayData(scATAC_cellObj, slot = "counts")[mousePeaks,] > 0)
+## Add meta data
+scATAC_cellObj <- AddMetaData(object = scATAC_cellObj,
+                          metadata = nCount_peaks_human,
+                          col.name = "nCount_peaks_human")
+scATAC_cellObj <- AddMetaData(object = scATAC_cellObj,
+                          metadata = nCount_peaks_mouse,
+                          col.name = "nCount_peaks_mouse")
+scATAC_cellObj <- AddMetaData(object = scATAC_cellObj,
+                          metadata = nFeature_peaks_human,
+                          col.name = "nFeature_peaks_human")
+scATAC_cellObj <- AddMetaData(object = scATAC_cellObj,
+                          metadata = nFeature_peaks_mouse,
+                          col.name = "nFeature_peaks_mouse")
+
+scATAC_cellObj <- AddMetaData(object = scATAC_cellObj,
+                              metadata = scATAC_obj$TSS.enrichment,
+                              col.name = "TSS.enrichment")
+scATAC_cellObj <- AddMetaData(object = scATAC_cellObj,
+                              metadata = scATAC_obj$high.tss,
+                              col.name = "high.tss")
+scATAC_cellObj <- AddMetaData(object = scATAC_cellObj,
+                              metadata = scATAC_obj$nucleosome_signal,
+                              col.name = "nucleosome_signal")
+scATAC_cellObj <- AddMetaData(object = scATAC_cellObj,
+                              metadata = scATAC_obj$nucleosome_group,
+                              col.name = "nucleosome_group")
+
+## Define human, mouse cells and background
+scATAC_cellObj@meta.data <- scATAC_cellObj@meta.data %>%
+    mutate(
+        human_percentage = nCount_peaks_human/nCount_peaks,
+        mouse_percentage = 1-human_percentage
+    ) %>%
+    mutate(
+        cell_group = case_when(
+            human_percentage >= 0.9 ~ "human",
+            mouse_percentage >= 0.9 ~ "mouse",
+            TRUE ~ "doublet"
+        )
+    )
+
+scATAC_obj <- AddMetaData(object = scATAC_obj,
+                          metadata = scATAC_cellObj$cell_group,
+                          col.name = "cell_group")
+
+scATAC_obj@meta.data <- scATAC_obj@meta.data %>%
+    mutate(
+        cell_group = case_when(
+            is.na(cell_group) ~ "background",
+            TRUE ~ cell_group
+        )
+    )
+
+qcPlot <- VlnPlot(
+  object = scATAC_cellObj,
+  features = c('FRiP', 'nCount_peaks',
+               'TSS.enrichment', 'blacklist_fraction', 'nucleosome_signal'),
+  pt.size = 0.1,
+  ncol = 5
+)
+
+if(length(cells)>=150){
+    scATAC_cellObj <- RunTFIDF(scATAC_cellObj)
+    scATAC_cellObj <- FindTopFeatures(scATAC_cellObj, min.cutoff = 'q0')
+    scATAC_cellObj <- RunSVD(scATAC_cellObj)
+    
+    scATAC_cellObj <- RunUMAP(object = scATAC_cellObj, reduction = 'lsi', dims = 2:30)
+    scATAC_cellObj <- FindNeighbors(object = scATAC_cellObj, reduction = 'lsi', dims = 2:30)
+    scATAC_cellObj <- FindClusters(object = scATAC_cellObj, verbose = FALSE, algorithm = 3)
+    clusterPlot <- DimPlot(object = scATAC_cellObj, label = TRUE) + NoLegend()
+}
+saveRDS(scATAC_cellObj, file=paste0(params$sampleName, ".rds"))
+```
+
+Analysis Result {data-orientation=rows}
+====================
+
+
+<h2>Sample: `r params$sampleName` (`r params$refGenome`)</h2>
+
+Row
+----------
+
+### Estimated Number of Cells
+
+```{r}
+human_cellNum <- scATAC_cellObj[["cell_group"]] %>%
+    dplyr::filter(cell_group == "human") %>%
+    nrow() %>%
+    scales::label_comma()()
+mouse_cellNum <- scATAC_cellObj[["cell_group"]] %>%
+    dplyr::filter(cell_group == "mouse") %>%
+    nrow() %>%
+    scales::label_comma()()
+valueBox(paste0(human_cellNum, "/", mouse_cellNum),
+         caption = "Estimated number of cells\n(human/mouse)", icon="fa-circle-notch", color="primary")
+```
+
+### Median of Total Fragments in Cells
+
+```{r}
+human_cellFragMedian <- scATAC_cellObj[[c("cell_group", "fragments")]] %>%
+    dplyr::filter(cell_group == "human") %>%
+    pull(fragments) %>% 
+    median() %>% 
+    as.integer() %>%
+    scales::label_comma()()
+mouse_cellFragMedian <- scATAC_cellObj[[c("cell_group", "fragments")]] %>%
+    dplyr::filter(cell_group == "mouse") %>%
+    pull(fragments) %>% 
+    median() %>% 
+    as.integer() %>%
+    scales::label_comma()()
+valueBox(paste0(human_cellFragMedian, "/", mouse_cellFragMedian), 
+         caption = "Median fragments per cell\n(human/mouse)", icon="fa-chart-bar", color="danger")
+```
+
+### Median FRiP of Cells
+
+```{r}
+human_cellFRiPMedian <- scATAC_cellObj[[c("cell_group", "FRiP")]] %>%
+    dplyr::filter(cell_group == "human") %>%
+    pull(FRiP) %>% 
+    median() %>% 
+    scales::label_percent(0.01)()
+mouse_cellFRiPMedian <- scATAC_cellObj[[c("cell_group", "FRiP")]] %>%
+    dplyr::filter(cell_group == "mouse") %>%
+    pull(FRiP) %>% 
+    median() %>% 
+    scales::label_percent(0.01)()
+valueBox(paste0(human_cellFRiPMedian, "/", mouse_cellFRiPMedian), 
+         caption = "Median fraction of fragments overlapping peaks\n(human/mouse)", icon="fa-barcode", color="info")
+```
+
+Row
+----------
+
+### Cells
+
+```{r}
+human_cellFragMean <- scATAC_cellObj[[c("cell_group", "fragments")]] %>%
+    dplyr::filter(cell_group == "human") %>%
+    pull(fragments) %>% 
+    mean() %>% 
+    as.integer() %>%
+    scales::label_comma()()
+mouse_cellFragMean <- scATAC_cellObj[[c("cell_group", "fragments")]] %>%
+    dplyr::filter(cell_group == "mouse") %>%
+    pull(fragments) %>% 
+    mean() %>% 
+    as.integer() %>%
+    scales::label_comma()()
+human_cellFRiPMean <- scATAC_cellObj[[c("cell_group", "FRiP")]] %>%
+    dplyr::filter(cell_group == "human") %>%
+    pull(FRiP) %>% 
+    mean() %>% 
+    scales::label_percent(0.01)()
+mouse_cellFRiPMean <- scATAC_cellObj[[c("cell_group", "FRiP")]] %>%
+    dplyr::filter(cell_group == "mouse") %>%
+    pull(FRiP) %>% 
+    mean() %>% 
+    scales::label_percent(0.01)()
+
+tribble(
+  ~"", ~"",
+  "Estimated number of human cells (GRCh38)", human_cellNum,
+  "Estimated number of mouse cells (mm10)", mouse_cellNum,
+  "Mean fragments per human cell (GRCh38)", human_cellFragMean,
+  "Mean fragments per mouse cell (mm10)", mouse_cellFragMean,
+  "Median fragments per human cell (GRCh38)", human_cellFragMedian,
+  "Median fragments per mouse cell (mm10)", mouse_cellFragMedian,
+  "Mean of FRiP in human cells (GRCh38)", human_cellFRiPMean,
+  "Mean of FRiP in mouse cells (mm10)", mouse_cellFRiPMean,
+  "Median of FRiP in human cells (GRCh38)", human_cellFRiPMedian,
+  "Median of FRiP in mouse cells (mm10)", mouse_cellFRiPMedian,
+) %>% kbl() %>% kable_paper("hover", html_font = "arial, helvetica, sans-serif") %>%
+  column_spec(1, bold = T)
+```
+
+### Sequencing
+
+```{r}
+if(!is.null(params$readReport)){
+  readReport <- read_json(params$readReport)
+}else{
+  readReport <- list(
+    "rawReadPairs"=NULL,
+    "validBarcode_count"=NULL,
+    "validBarcode_readCount"=NULL,
+    "Q30_bcRead"=NULL,
+    "Q30_read1"=NULL,
+    "Q30_read2"=NULL
+  )
+}
+
+validBarcode_rate <- as.numeric(readReport$validBarcode_readCount)/as.numeric(readReport$rawReadPairs)
+validBarcode_rate <- scales::label_percent(0.01)(validBarcode_rate)
+
+tribble(
+  ~"", ~"",
+  "Raw read pairs", scales::label_comma()(as.numeric(readReport$rawReadPairs)),
+  "Valid barcodes", scales::label_comma()(as.numeric(readReport$validBarcode_count)),
+  "Read pairs with valid barcode", paste0(scales::label_comma()(as.numeric(readReport$validBarcode_readCount)), " (", validBarcode_rate,")"),
+  "Q30 bases in barcodes", readReport$Q30_bcRead,
+  "Q30 bases in read 1", readReport$Q30_read1,
+  "Q30 bases in read 2", readReport$Q30_read2
+) %>% kbl() %>% kable_paper("hover", html_font = "arial, helvetica, sans-serif") %>%
+  column_spec(1, bold = T)
+```
+
+Row {data-height=500 .tabset .tabset-pills}
+----------
+
+### Cells Knee Plot
+
+```{r combinedKnee}
+cells_kneeData <- scATAC_obj[[c("nCount_peaks", "cell_group")]] %>%
+    dplyr::filter(cell_group %in% c("human", "mouse", "doublet", "background")) %>%
+    mutate(
+        type = case_when(
+            cell_group != "background" ~ "cell",
+            TRUE ~ "background"
+        )
+    ) %>%
+    arrange(desc(nCount_peaks)) %>%
+    mutate(idx = row_number())
+
+##cat(paste0("cells_kneeData", nrow(cells_kneeData)))
+
+fig <- plot_ly(data = cells_kneeData, x = ~idx, y = ~nCount_peaks, type = 'scatter', mode = 'lines',
+               color = ~type, colors = c('grey', '#002366'),
+               hovertemplate = 'Fragments: %{y}<extra>%{fullData.name}</extra>',
+               line = list(width = 3),
+               height = 400, width = 360)
+fig <- layout(fig, title = "All cells (including doublets)",
+              xaxis = list(type = "log", title = "Barcodes"), 
+              yaxis = list(type = "log", title = "Fragments in Peaks"), showlegend = FALSE)
+config_plotly_fig(fig) %>% toWebGL()
+```
+
+```{r eval = human_cellNum > 100}
+human_kneeData <- scATAC_obj[[c("nCount_peaks_human", "cell_group")]] %>%
+    dplyr::filter(cell_group %in% c("human", "doublet", "background")) %>%
+    mutate(
+        type = case_when(
+            cell_group == "human" ~ "cell",
+            TRUE ~ "background"
+        )
+    ) %>%
+    arrange(desc(nCount_peaks_human)) %>%
+    mutate(idx = row_number())
+
+fig <- plot_ly(data = human_kneeData, x = ~idx, y = ~nCount_peaks_human, type = 'scatter', mode = 'lines',
+               color = ~type, colors = c('grey', '#002366'),
+               hovertemplate = 'Fragments: %{y}<extra>%{fullData.name}</extra>',
+               line = list(width = 3),
+               height = 400, width = 360)
+fig <- layout(fig, title = "human",
+              xaxis = list(type = "log", title = "Barcodes"), 
+              yaxis = list(type = "log", title = "Fragments in Peaks"), showlegend = FALSE)
+config_plotly_fig(fig) %>% toWebGL()
+```
+
+```{r eval = mouse_cellNum > 100}
+mouse_kneeData <- scATAC_obj[[c("nCount_peaks_mouse", "cell_group")]] %>%
+    dplyr::filter(cell_group %in% c("mouse", "doublet", "background")) %>%
+    mutate(
+        type = case_when(
+            cell_group == "mouse" ~ "cell",
+            TRUE ~ "background"
+        )
+    ) %>%
+    arrange(desc(nCount_peaks_mouse)) %>%
+    mutate(idx = row_number())
+
+fig <- plot_ly(data = d, x = ~idx, y = ~nCount_peaks_mouse, type = 'scatter', mode = 'lines',
+               color = ~type, colors = c('grey', '#002366'),
+               hovertemplate = 'Fragments: %{y}<extra>%{fullData.name}</extra>',
+               line = list(width = 3),
+               height = 400, width = 360)
+fig <- layout(fig, title = "mouse",
+              xaxis = list(type = "log", title = "Barcodes"), 
+              yaxis = list(type = "log", title = "Fragments in Peaks"), showlegend = FALSE)
+config_plotly_fig(fig) %>% toWebGL()
+```
+
+### Cells Fragments Distribution
+
+```{r}
+ggplot(cells_kneeData, aes(nCount_peaks, color=type, fill=type)) + geom_density(alpha=0.4, adjust = 5)+
+  scale_x_log10() + xlab("Fragments") + theme_bw() + 
+  theme(panel.grid=element_blank(), legend.position="bottom", legend.title=element_blank()) +
+  scale_fill_manual(values=c("grey", "steelblue")) +
+  scale_color_manual(values=c("grey", "steelblue")) +
+  ggtitle("All cells (including doublets)")
+```
+
+```{r eval = human_cellNum > 100}
+ggplot(human_kneeData, aes(nCount_peaks_human, color=type, fill=type)) + geom_density(alpha=0.4, adjust = 5)+
+  scale_x_log10() + xlab("Fragments") + theme_bw() + 
+  theme(panel.grid=element_blank(), legend.position="bottom", legend.title=element_blank()) +
+  scale_fill_manual(values=c("grey", "steelblue")) +
+  scale_color_manual(values=c("grey", "steelblue")) +
+  ggtitle("human")
+```
+
+```{r eval = mouse_cellNum > 100}
+ggplot(mouse_kneeData, aes(nCount_peaks_mouse, color=type, fill=type)) + geom_density(alpha=0.4, adjust = 5)+
+  scale_x_log10() + xlab("Fragments") + theme_bw() + 
+  theme(panel.grid=element_blank(), legend.position="bottom", legend.title=element_blank()) +
+  scale_fill_manual(values=c("grey", "steelblue")) +
+  scale_color_manual(values=c("grey", "steelblue"))+
+  ggtitle("mouse")
+```
+
+Row {data-height=600}
+----------
+
+### Barnyard
+
+```{r}
+barnyard_data <- scATAC_obj[[c("nCount_peaks_human", "nCount_peaks_mouse", "cell_group")]]
+
+fig <- plot_ly(data = barnyard_data, x = ~nCount_peaks_mouse, y = ~nCount_peaks_human, 
+               type = 'scatter', mode = 'markers',
+               color = ~cell_group, colors = c('#bababa', '#d95f02', '#1b9e77', '#7570b3'),
+               hovertemplate = 'Human Fragments: %{y}<br>Mouse Fragments: %{x}<extra>%{fullData.name}</extra>',
+               height = 400, width = 360)
+fig <- layout(fig,
+              xaxis = list(type = "log", title = "Mouse"), 
+              yaxis = list(type = "log", title = "Human"), showlegend = FALSE)
+config_plotly_fig(fig) %>% toWebGL()
+```
+
+
+### Cells Metrics
+
+```{r fig.width=15, fig.height=7, fig.fullwidth=TRUE, out.width="100%"}
+qcPlot
+```
+
+Row {data-height=600}
+----------
+
+### Cluster (Colored by Group)
+
+```{r}
+if(length(cells)>=150){
+  clusterPlot %>% ggplotly() %>% config_plotly_fig() %>% toWebGL()
+}else{
+  cat("Too few cells\n")
+}
+```
+
+### Cluster (Colored by Depth)
+
+```{r}
+if(length(cells)>=150){
+  scATAC_cellObj[["logFragments"]] <- log10(scATAC_cellObj[["fragments"]])
+  depthPlot <- FeaturePlot(object = scATAC_cellObj, features = 'logFragments') + 
+    scale_color_continuous(name="log10 Fragments", type = "viridis", direction = 1) + labs(title = NULL)
+  depthPlot %>% ggplotly() %>% config_plotly_fig() %>% toWebGL()
+}else{
+  cat("Too few cells\n")
+}
+```
+
+Data Quality {data-orientation=rows}
+====================
+
+Row {data-height=500}
+----------
+
+### Library Complexity
+
+```{r echo=FALSE}
+read_tsv(params$libraryComplexity) %>%
+    dplyr::rename(
+       "NRF" = `m0/mt`,
+       "PBC1" = `m1/m0`,
+       "PBC2" = `m1/m2`
+    ) %>% 
+    dplyr::select(NRF, PBC1, PBC2) %>% t() %>% 
+    as.data.frame() %>% rownames_to_column("Measure") %>% 
+    dplyr::rename(Value=V1) %>% 
+    mutate(Value = scales::label_number(0.001)(Value)) %>%
+    kbl() %>% 
+    kable_paper("hover", html_font = "arial, helvetica, sans-serif") %>%
+    column_spec(1, bold = T)
+```
+
+Duplcation Ratio: `r params$dupRatio %>% as.numeric %>% scales::percent(0.01)`
+
+### Sequencing Saturation
+
+```{r}
+if(!is.null(params$saturation_json)){
+  saturation_data <- fromJSON(params$saturation_json) %>%
+      as_tibble() %>%
+      mutate(across(everything(), .fns = as.numeric)) %>%
+      mutate(saturation = 1-uniqueFrags/seqDep) %>%
+      mutate(saturation = scales::label_percent(0.01)(saturation))
+}
+
+plot_ly(saturation_data, x= ~seqDep, y= ~uniqueFrags, text= ~saturation,
+       type = 'scatter', mode = 'lines',
+       hovertemplate = 'Read Pairs: %{x}<br>Unique Fragments: %{y}<br>Saturation: %{text}<extra></extra>') %>%
+    config_plotly_fig() %>%
+    toWebGL()
+```
+
+Row
+----------
+
+### Mapping Result
+
+```{r}
+if(!is.null(params$bowtie2_report)){
+  mappingReport <- read_json(params$bowtie2_report)
+}else{
+  mappingReport <- list(
+    "totalFragments"=NULL,
+    "uniqueReadPair"=NULL,
+    "uniqueMappingRate"=NULL,
+    "totalMappingRate"=NULL
+  )
+}
+frag_tibble <- read_tsv(params$fragmentFile, col_names = c("chr", "start", "end", "barcode", "count"))
+totalFrag <- frag_tibble %>% dplyr::pull(count) %>% sum()
+mito_counts <- frag_tibble %>% dplyr::filter(str_detect(chr, "chrM")) %>% dplyr::pull(count) %>% sum()
+nfr_counts <- frag_tibble %>% dplyr::filter(end-start<=147) %>% dplyr::pull(count) %>% sum()
+monoNucleosome_counts <- frag_tibble %>% dplyr::filter(end-start>147, end-start<=294) %>% dplyr::pull(count) %>% sum()
+tribble(
+  ~"", ~"",
+  "Total read pairs", scales::label_comma()(as.numeric(mappingReport$totalFragments)),
+  "Uniquely mapped read pairs", scales::label_comma()(as.numeric(mappingReport$uniqueReadPair)),
+  "Unique mapping rate", mappingReport$uniqueMappingRate,
+  "Total mapping rate", mappingReport$totalMappingRate,
+  "Total fragments (after dedup)", scales::label_comma()(totalFrag),
+  "Mitochondrial fragments", scales::label_comma()(mito_counts),
+  "Fragments in nucleosome-free regions", scales::label_comma()(nfr_counts),
+  "Fragments in mono-nucleosome regions", scales::label_comma()(monoNucleosome_counts),
+) %>% kbl() %>% kable_paper("hover", html_font = "arial, helvetica, sans-serif") %>%
+  column_spec(1, bold = T)
+```
+
+### Insert Size
+
+```{r}
+fragLenPlot ##%>% ggplotly() %>% config_plotly_fig() %>% toWebGL()
+```
+
+Row
+----------
+
+### Targeting
+
+```{r}
+tss_score <- scATAC_obj@assays$peaks@positionEnrichment$TSS %>% apply(2, mean) %>% max()
+tribble(
+  ~"", ~"",
+  "Raw macs peaks", scales::label_comma()(length(macs_peaks)),
+  "Peaks after filtration", scales::label_comma()(nrow(scATAC_obj)),
+  "Peaks from human", scales::label_comma()(length(humanPeaks)),
+  "Peaks from mouse", scales::label_comma()(length(mousePeaks)),
+  "TSS enrichment score", scales::label_number(0.01)(tss_score)
+) %>% kbl() %>% kable_paper("hover", html_font = "arial, helvetica, sans-serif") %>%
+  column_spec(1, bold = T)
+```
+
+Row
+----------
+
+### TSS Enrichment
+
+```{r}
+tssPlot ##%>% ggplotly() %>% config_plotly_fig() %>% toWebGL()
+```
+
+### Peaks Targeting
+
+```{r}
+k <- scATAC_obj@meta.data %>% 
+    dplyr::select(FRiP,fragments, cell_group) %>%
+    tibble::rownames_to_column("CB")
+
+## Some points have FRiP larger than 1, needs to be checked
+ggplot(k, aes(x=fragments, y=FRiP, color=cell_group))+geom_point(alpha=0.4)+scale_x_log10() + 
+    theme_bw() + scale_color_manual(values=c("#bababa", "#d95f02", "#1b9e77", "#7570b3")) + ylim(0,1) +
+    theme(legend.title=element_blank(), panel.grid=element_blank())
+##ggplotly(p) %>% toWebGL()
+```
+
+```{js}
+// set knee plot margin to auto
+$( document ).ready(function() {
+    document.querySelector(".plot-container").querySelector(".svg-container").style.margin = "auto";
+});
+```
+
+
+```{r include=FALSE}
+## gather metrics and write metrics json file
+## metrics includes:
+## cellNumber
+## mean fragments per cell
+## median fragments per cell
+## mean FRiP per cell
+## median FRiP per cell
+## raw Reads
+## valid barcode ratio
+## Q30 in barcode
+## Q30 in read1
+## Q30 in read2
+## NRF
+## PBC1
+## PBC2
+## Duplication ratio
+## total fragments
+## total reads of fragments
+
+##metrics_tbl <- tribble(
+##  ~"term", ~"value",
+##  "sample", params$sampleName,
+##  "Number of Raw Reads", readReport$rawReadPairs,
+##  "Reads with Valid Barcodes", validBarcode_rate,
+##  "Q30 Bases in Barcodes", readReport$Q30_bcRead,
+##  "Q30 Bases in Read 1", readReport$Q30_read1,
+##  "Q30 Bases in Read 2", readReport$Q30_read2,
+##  "Total Mapping Rate", ,
+##  "Uniquely Mapping Rate", ,
+##  
+##)
+```

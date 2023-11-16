@@ -6,11 +6,11 @@ process DEDUP {
     //    enabled: params.outdir as boolean
 
     input:
-    tuple val(sampleID), val(sampleName), path(inputBam)
-    tuple val(sampleID), val(sampleName), path(inputBamBai)
+    tuple val(sampleID), path(inputBam)
+    tuple val(sampleID), path(inputBamBai)
 
     output:
-    tuple val(sampleID), val(sampleName), env(ratio), emit: dupRatio
+    tuple val(sampleID), env(ratio), emit: dupRatio
     //tuple val(sampleID), val(sampleName), path("${sampleID}.final.bam"), emit: finalBam
     //tuple val(sampleID), val(sampleName), path("${sampleID}.final.bam.bai"), emit: finalBai
 

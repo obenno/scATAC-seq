@@ -143,7 +143,7 @@ https://conda.anaconda.org/bioconda/noarch/sinto-0.8.0-pyhfa5458b_0.tar.bz2
 https://conda.anaconda.org/bioconda/linux-64/cutadapt-4.1-py39hbf8eff0_1.tar.bz2
 https://conda.anaconda.org/conda-forge/linux-64/r-base-4.1.2-hde4fec0_0.tar.bz2
 https://conda.anaconda.org/bioconda/noarch/bioconductor-biocgenerics-0.40.0-r41hdfd78af_0.tar.bz2
-https://conda.anaconda.org/bioconda/noarch/bioconductor-genomeinfodbdata-1.2.7-r41hdfd78af_1.tar.bz2
+https://conda.anaconda.org/bioconda/noarch/bioconductor-genomeinfodbdata-1.2.7-r41hdfd78af_2.tar.bz2
 https://conda.anaconda.org/bioconda/noarch/bioconductor-protgenerics-1.26.0-r41hdfd78af_0.tar.bz2
 https://conda.anaconda.org/bioconda/linux-64/bioconductor-zlibbioc-1.40.0-r41hd029910_0.tar.bz2
 https://conda.anaconda.org/bioconda/linux-64/macs2-2.2.7.1-py39h38f01e4_3.tar.bz2

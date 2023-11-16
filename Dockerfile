@@ -18,20 +18,20 @@ RUN conda install mamba -n base -c conda-forge
 ## Setup workdir
 WORKDIR /app
 
-## download app source
-RUN git clone https://github.com/obenno/scATAC-seq ./scATAC-seq
-WORKDIR /app/scRNA-seq
-##COPY scRNAseq_env.yml .
+#### download app source
+##RUN git clone https://github.com/obenno/scATAC-seq ./scATAC-seq
+##WORKDIR /app/scATAC-seq
 ## create conda env with app env file
-RUN mamba env create -f scRNAseq_env.yml
+##RUN mamba env create -f scRNAseq_env.yml
 
 ## All packages will be installed to base env
-## and could be invoked directoryly
-RUN mamba install -f conda/scATAC_packages.txt
+## and could be invoked directly
+COPY conda/scATAC_packages.txt .
+RUN mamba install -n base --file scATAC_packages.txt
 
 ## install SeuratDisk
-RUN mamba install -c bioconda -c conda-forge r-hdf5r r-cli r-crayon r-matrix r-r6 r-rlang r-withr r-stringi
-RUN Rscript -e 'if (!requireNamespace("remotes", quietly = TRUE)) {install.packages("remotes", repos = "https://cloud.r-project.org/", lib = "/opt/conda/lib/R/library")}; remotes::install_github("mojaveazure/seurat-disk", lib = "/opt/conda/lib/R/library")'
+RUN mamba install -c bioconda -c conda-forge r-hdf5r r-cli r-crayon r-matrix r-r6 r-rlang r-withr r-stringi r-remotes
+RUN Rscript -e 'remotes::install_github("mojaveazure/seurat-disk", lib = "/opt/conda/lib/R/library")'
 
 ## copy entrypoint.sh
 ##COPY entrypoint.sh .
