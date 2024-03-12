@@ -1,22 +1,6 @@
-process CAT_TRIM_FASTQ {
+process CHECK_BARCODE {
     tag "${sampleID}"
     label 'process_high'
-    publishDir "${params.outdir}/cutqc",
-        mode: "${params.publish_dir_mode}",
-        enabled: params.outdir as boolean,
-        saveAs: { filename ->
-        if(filename=~/readReport.json/){
-            return filename
-        }else{
-            return null
-        }
-    }
-    // conda (params.enable_conda ? "conda-forge::sed=4.7" : null)
-    // if (workflow.containerEngine == 'singularity' && !params.singularity_pull_docker_container) {
-    //     container "https://containers.biocontainers.pro/s3/SingImgsRepo/biocontainers/v1.2.0_cv1/biocontainers_v1.2.0_cv1.img"
-    // } else {
-    //     container "biocontainers/biocontainers:v1.2.0_cv1"
-    // }
 
     input:
     tuple val(sampleID), path(read1_list), path(read2_list)
@@ -25,15 +9,10 @@ process CAT_TRIM_FASTQ {
     path(whitelist)
 
     output:
-    //tuple val(sampleID),     path("*.chromap_aln.bam"), emit: bam
-    //tuple val(sampleID),     path("*.chromap_aln.bam.bai"), emit: bai
-    tuple val(sampleID),   path("*R1.trimmed.fq.gz"), emit: read1
-    tuple val(sampleID),   path("*R2.trimmed.fq.gz"), emit: read2
-    //tuple val(sampleID), path("*_1.merged.bc.fq.gz"), emit: read_bc
-    tuple val(sampleID),   path("${sampleID}.readReport.json"), emit: readReport
-    //tuple val(sampleID), path("*.read_stat.txt"), emit: report
-    //tuple val(sampleID), path("*_cutqc_report.html"), emit: cutqc_report
-    //path "versions.yml"                       , emit: versions
+    tuple val(sampleID),   path("${sampleID}_1.merged.fq.gz"), emit: merged_read1
+    tuple val(sampleID),   path("${sampleID}_2.merged.fq.gz"), emit: merged_read2
+    tuple val(sampleID),   path("*Aligned.sortedByCoord.out.bam"), emit: bam
+    tuple val(sampleID),   path("${sampleID}.Solo.out/Gene/Summary.csv"), emit: summary
 
     script:
     def prefix   = "${sampleID}"
@@ -118,74 +97,114 @@ process CAT_TRIM_FASTQ {
         exit 1, "soloType only support CB_UMI_Simple and CB_UMI_Complex for now."
     }
 
-    scriptString.push(
+    scriptString.reverse().join()
+}
+
+process EXTRACT_BARCODE {
+    tag "${sampleID}"
+    label 'process_high'
+
+    input:
+    tuple val(sampleID), path(bam)
+    tuple val(sampleID), path(merged_read1)
+    tuple val(sampleID), path(merged_read2)
+
+    output:
+    tuple val(sampleID), path("*cutadapt_input.R1.fq.gz"), emit: read1
+    tuple val(sampleID), path("*cutadapt_input.R2.fq.gz"), emit: read2
+
+    script:
+    def prefix   = "${sampleID}"
+    def pigzThreads = Math.min(6, task.cpus)
+
     """
     ## Extract barcodes to a separate fastq
     reads_CB=\$(mktemp -p ./)
     temp_CB=\$(mktemp -p ./)
-    samtools view -@ ${task.cpus} ${prefix}.Aligned.sortedByCoord.out.bam |
-        awk '{CB=\$0; gsub(/.*CB:Z:/, "", CB); gsub(/\\t.*\$/, "", CB); if(CB!="-"){print \$1"\\t"CB}}' > \$temp_CB
-    sort -u --parallel ${task.cpus} -T ./ \$temp_CB > \$reads_CB
-    rm \$temp_CB
-    ##readsID=\$(mktemp -p ./)
-    ##cut -f 1 \$reads_CB > \$readsID
-    ##tmp_whitelist=\$(mktemp -p ./)
-    ##cut -f 2 \$reads_CB | sort -u --parallel ${task.cpus} > \$tmp_whitelist
-    ## prepare input reads for chromap
-    ## use the last 90 nt of R1
-    zcat ${prefix}_1.merged.fq.gz |
-        awk '
-        ARGIND==1{
-            a[\$1]=\$2
-        }
-        ARGIND==2 && FNR%4==1{
-            if(substr(\$1, 2) in a){
-                print "@"a[substr(\$1,2)]":"substr(\$0,2);
-                getline;
-                print substr(\$1, 90);
-                getline;
-                print;
-                getline;
-                print substr(\$1, 90)
-            }
-        }
-        ' \$reads_CB - |
+    tmpSAM=\$(mktemp -p ./)
+    reads_CB_unique=\$(mktemp -p ./)
+    
+    ## covert bam to sam text with -@ parameter
+    samtools view -@ ${task.cpus} $bam > \$tmpSAM
+    awk '{CB=\$0; gsub(/.*CB:Z:/, "", CB); gsub(/\\t.*\$/, "", CB); if(CB!="-"){print \$1"\\t"CB}}' \$tmpSAM > \$temp_CB
+    rm \$tmpSAM
+    sort -u --parallel ${task.cpus} -T ./ \$temp_CB > \$reads_CB_unique
+    sort -k1,1 --parallel ${task.cpus} -T ./ \$reads_CB_unique > \$reads_CB
+    rm \$temp_CB \$reads_CB_unique
+
+    tmpR1=\$(mktemp -p ./)
+    tmpR1_sorted=\$(mktemp -p ./)
+    tmpR1_renamed=\$(mktemp -p ./)
+    zcat $merged_read1 |
+        paste - - - - > \$tmpR1
+    sort -t \$'\\t' -k 1,1 --parallel ${task.cpus} -T ./ \$tmpR1 > \$tmpR1_sorted
+    paste \$tmpR1_sorted \$reads_CB |
+        awk -F"\\t" '{print "@"\$6":"substr(\$1, 2)"\\t"substr(\$2, 47)"\\t"\$3"\\t"substr(\$4, 47)}' > \$tmpR1_renamed
+    rm \$tmpR1 \$tmpR1_sorted
+    
+    tmpR2=\$(mktemp -p ./)
+    tmpR2_sorted=\$(mktemp -p ./)
+    tmpR2_renamed=\$(mktemp -p ./)
+    zcat $merged_read2 |
+        paste - - - - > \$tmpR2
+    sort -t \$'\\t' -k 1,1 --parallel ${task.cpus} -T ./ \$tmpR1 > \$tmpR2_sorted
+    paste \$tmpR2_sorted \$reads_CB |
+        awk -F"\\t" '{print "@"\$6":"substr(\$1, 2)"\\t"\$2"\\t"\$3"\\t"\$4}' > \$tmpR2_renamed
+    rm \$tmpR2 \$tmpR2_sorted
+    rm \$reads_CB
+    
+    ## shuffle fastq
+    tmpShuffled=\$(mktemp -p ./)
+    paste \$tmpR1_renamed \$tmpR2_renamed | shuf > \$tmpShuffled
+    rm \$tmpR1_renamed \$tmpR2_renamed
+    
+    awk -F "\\t" '{print \$1"\\n"\$2"\\n"\$3"\\n"\$4}' \$tmpShuffled |
         pigz -p $pigzThreads > ${prefix}.cutadapt_input.R1.fq.gz
-
-    zcat ${prefix}_2.merged.fq.gz |
-        awk '
-        ARGIND==1{
-            a[\$1]=\$2
-        }
-        ARGIND==2 && FNR%4==1{
-            if(substr(\$1, 2) in a){
-                print "@"a[substr(\$1,2)]":"substr(\$0,2);
-                getline;
-                print;
-                getline;
-                print;
-                getline;
-                print;
-            }
-        }
-        ' \$reads_CB - |
+    awk -F "\\t" '{print \$5"\\n"\$6"\\n"\$7"\\n"\$8}' \$tmpShuffled |
         pigz -p $pigzThreads > ${prefix}.cutadapt_input.R2.fq.gz
+    rm \$tmpShuffled
+    """
+}
 
-    ##seqtk subseq ${prefix}_2.merged.fq.gz \$readsID |
-    ##    pigz -p $pigzThreads > ${prefix}.cutadapt_input.R2.fq.gz
+process TRIM_FASTQ {
+    tag "${sampleID}"
+    label 'process_high'
+    publishDir "${params.outdir}/cutqc",
+        mode: "${params.publish_dir_mode}",
+        enabled: params.outdir as boolean,
+        saveAs: { filename ->
+        if(filename=~/readReport.json/){
+            return filename
+        }else{
+            return null
+        }
+    }
 
+    input:
+    tuple val(sampleID), path(read1)
+    tuple val(sampleID), path(read2)
+    tuple val(sampleID), path(summary)
+
+    output:
+    tuple val(sampleID),   path("*R1.trimmed.fq.gz"), emit: read1
+    tuple val(sampleID),   path("*R2.trimmed.fq.gz"), emit: read2
+    tuple val(sampleID),   path("${sampleID}.readReport.json"), emit: readReport
+
+    script:
+    def prefix   = "${sampleID}"
+    """
     ## cutadapt QC and trim ME adapter
     cutadapt -j $task.cpus \\
              -q 30 \\
-             -m 50 \\
+             -m $params.trim_mLen \\
              $params.trimOpt \\
              -o ${prefix}.R1.trimmed.fq.gz -p ${prefix}.R2.trimmed.fq.gz \\
-             ${prefix}.cutadapt_input.R1.fq.gz ${prefix}.cutadapt_input.R2.fq.gz
+             $read1 $read2
 
-    validBarcode_ratio=\$(awk -F"," '\$1=="Reads With Valid Barcodes"{print \$2}' ${prefix}.Solo.out/Gene/Summary.csv)
-    rawReadPairs=\$(awk -F"," '\$1=="Number of Reads"{print \$2}' ${prefix}.Solo.out/Gene/Summary.csv)
-    Q30_read1=\$(awk -F"," '\$1=="Q30 Bases in CB+UMI"{print \$2}' ${prefix}.Solo.out/Gene/Summary.csv)
-    Q30_read2=\$(awk -F"," '\$1=="Q30 Bases in RNA read"{print \$2}' ${prefix}.Solo.out/Gene/Summary.csv)
+    validBarcode_ratio=\$(awk -F"," '\$1=="Reads With Valid Barcodes"{print \$2}' $summary)
+    rawReadPairs=\$(awk -F"," '\$1=="Number of Reads"{print \$2}' $summary)
+    Q30_read1=\$(awk -F"," '\$1=="Q30 Bases in CB+UMI"{print \$2}' $summary)
+    Q30_read2=\$(awk -F"," '\$1=="Q30 Bases in RNA read"{print \$2}' $summary)
     
     jq -n \
        --arg sampleName "${sampleID}" \\
@@ -195,7 +214,5 @@ process CAT_TRIM_FASTQ {
        --arg Q30_read2 "\$Q30_read2" \\
        '{sampleName: \$sampleName, rawReadPairs: \$rawReadPairs, validBarcode_ratio: \$validBarcode_ratio, Q30_read1: \$Q30_read1, Q30_read2: \$Q30_read2}' > ${sampleID}.readReport.json
 
-    """.stripIndent()
-    )
-    scriptString.reverse().join()
+    """
 }

@@ -15,7 +15,7 @@ if (!params.bowtie2Index) { exit 1, 'Bowtie2 Index not specified!' }
 if (!params.whitelist) { exit 1, 'White not specified!' }
 
 // include all processes
-include { CAT_TRIM_FASTQ } from './cat_trim_fastq' addParams(params)
+include { CHECK_BARCODE; EXTRACT_BARCODE; TRIM_FASTQ } from './cat_trim_fastq' addParams(params)
 //include { CHROMAP } from './chromap_mapping'
 include { BOWTIE2 } from './bowtie2_mapping' addParams(params)
 include { LIBRARY_COMPLEXITY } from './library_complexity' addParams(params)
@@ -72,16 +72,28 @@ workflow {
     // when performing bowtie2-build, genomeIndex needs to be set as
     // genomeIndex = "genome.fa*" in config
     //ch_blackList = file(params.blackList)
-    CAT_TRIM_FASTQ(
+    CHECK_BARCODE(
         ch_fastq,
         ch_genomeGTF,
         ch_starIndex,
         ch_whitelist.toList()
     )
 
+    EXTRACT_BARCODE(
+        CHECK_BARCODE.out.bam,
+        CHECK_BARCODE.out.merged_read1,
+        CHECK_BARCODE.out.merged_read2
+    )
+
+    TRIM_FASTQ(
+        EXTRACT_BARCODE.out.read1,
+        EXTRACT_BARCODE.out.read2,
+        CHECK_BARCODE.out.summary
+    )
+    
     BOWTIE2(
-        CAT_TRIM_FASTQ.out.read1,
-        CAT_TRIM_FASTQ.out.read2,
+        TRIM_FASTQ.out.read1,
+        TRIM_FASTQ.out.read2,
         ch_bowtie2Index
     )
     LIBRARY_COMPLEXITY(
