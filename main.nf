@@ -113,7 +113,7 @@ workflow {
         BOWTIE2.out.bai
     )
     REPORT(
-        CAT_TRIM_FASTQ.out.readReport,
+        TRIM_FASTQ.out.readReport,
         BOWTIE2.out.mappingReport,
         DEDUP.out.dupRatio,
         LIBRARY_COMPLEXITY.out.libraryComplexity,
