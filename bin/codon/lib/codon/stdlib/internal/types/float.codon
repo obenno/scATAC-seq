@@ -1,0 +1,762 @@
+# Copyright (C) 2022-2023 Exaloop Inc. <https://exaloop.io>
+
+from internal.attributes import commutative
+from internal.gc import alloc_atomic, free
+from internal.types.complex import complex
+
+@extend
+class float:
+    def __new__() -> float:
+        return 0.0
+
+    def __new__(what) -> float:
+        # do not overload! (needed to avoid pyobj conversion)
+        if isinstance(what, str) or isinstance(what, Optional[str]):
+            return float._from_str(what)
+        else:
+            return what.__float__()
+
+    def __repr__(self) -> str:
+        return self.__format__("")
+
+    def __copy__(self) -> float:
+        return self
+
+    def __deepcopy__(self) -> float:
+        return self
+
+    @pure
+    @llvm
+    def __int__(self) -> int:
+        %0 = fptosi double %self to i64
+        ret i64 %0
+
+    def __float__(self) -> float:
+        return self
+
+    @pure
+    @llvm
+    def __bool__(self) -> bool:
+        %0 = fcmp one double %self, 0.000000e+00
+        %1 = zext i1 %0 to i8
+        ret i8 %1
+
+    def __complex__(self) -> complex:
+        return complex(self, 0.0)
+
+    def __pos__(self) -> float:
+        return self
+
+    @pure
+    @llvm
+    def __neg__(self) -> float:
+        %0 = fneg double %self
+        ret double %0
+
+    @pure
+    @commutative
+    @llvm
+    def __add__(a: float, b: float) -> float:
+        %tmp = fadd double %a, %b
+        ret double %tmp
+
+    @pure
+    @llvm
+    def __sub__(a: float, b: float) -> float:
+        %tmp = fsub double %a, %b
+        ret double %tmp
+
+    @pure
+    @commutative
+    @llvm
+    def __mul__(a: float, b: float) -> float:
+        %tmp = fmul double %a, %b
+        ret double %tmp
+
+    def __floordiv__(self, other: float) -> float:
+        return self.__truediv__(other).__floor__()
+
+    @pure
+    @llvm
+    def __truediv__(a: float, b: float) -> float:
+        %tmp = fdiv double %a, %b
+        ret double %tmp
+
+    @pure
+    @llvm
+    def __mod__(a: float, b: float) -> float:
+        %tmp = frem double %a, %b
+        ret double %tmp
+
+    def __divmod__(self, other: float) -> Tuple[float, float]:
+        mod = self % other
+        div = (self - mod) / other
+        if mod:
+            if (other < 0) != (mod < 0):
+                mod += other
+                div -= 1.0
+        else:
+            mod = (0.0).copysign(other)
+
+        floordiv = 0.0
+        if div:
+            floordiv = div.__floor__()
+            if div - floordiv > 0.5:
+                floordiv += 1.0
+        else:
+            floordiv = (0.0).copysign(self / other)
+
+        return (floordiv, mod)
+
+    @pure
+    @llvm
+    def __eq__(a: float, b: float) -> bool:
+        %tmp = fcmp oeq double %a, %b
+        %res = zext i1 %tmp to i8
+        ret i8 %res
+
+    @pure
+    @llvm
+    def __ne__(a: float, b: float) -> bool:
+        entry:
+            %tmp = fcmp one double %a, %b
+            %res = zext i1 %tmp to i8
+            ret i8 %res
+
+    @pure
+    @llvm
+    def __lt__(a: float, b: float) -> bool:
+        %tmp = fcmp olt double %a, %b
+        %res = zext i1 %tmp to i8
+        ret i8 %res
+
+    @pure
+    @llvm
+    def __gt__(a: float, b: float) -> bool:
+        %tmp = fcmp ogt double %a, %b
+        %res = zext i1 %tmp to i8
+        ret i8 %res
+
+    @pure
+    @llvm
+    def __le__(a: float, b: float) -> bool:
+        %tmp = fcmp ole double %a, %b
+        %res = zext i1 %tmp to i8
+        ret i8 %res
+
+    @pure
+    @llvm
+    def __ge__(a: float, b: float) -> bool:
+        %tmp = fcmp oge double %a, %b
+        %res = zext i1 %tmp to i8
+        ret i8 %res
+
+    @pure
+    @llvm
+    def sqrt(a: float) -> float:
+        declare double @llvm.sqrt.f64(double %a)
+        %tmp = call double @llvm.sqrt.f64(double %a)
+        ret double %tmp
+
+    @pure
+    @llvm
+    def sin(a: float) -> float:
+        declare double @llvm.sin.f64(double %a)
+        %tmp = call double @llvm.sin.f64(double %a)
+        ret double %tmp
+
+    @pure
+    @llvm
+    def cos(a: float) -> float:
+        declare double @llvm.cos.f64(double %a)
+        %tmp = call double @llvm.cos.f64(double %a)
+        ret double %tmp
+
+    @pure
+    @llvm
+    def exp(a: float) -> float:
+        declare double @llvm.exp.f64(double %a)
+        %tmp = call double @llvm.exp.f64(double %a)
+        ret double %tmp
+
+    @pure
+    @llvm
+    def exp2(a: float) -> float:
+        declare double @llvm.exp2.f64(double %a)
+        %tmp = call double @llvm.exp2.f64(double %a)
+        ret double %tmp
+
+    @pure
+    @llvm
+    def log(a: float) -> float:
+        declare double @llvm.log.f64(double %a)
+        %tmp = call double @llvm.log.f64(double %a)
+        ret double %tmp
+
+    @pure
+    @llvm
+    def log10(a: float) -> float:
+        declare double @llvm.log10.f64(double %a)
+        %tmp = call double @llvm.log10.f64(double %a)
+        ret double %tmp
+
+    @pure
+    @llvm
+    def log2(a: float) -> float:
+        declare double @llvm.log2.f64(double %a)
+        %tmp = call double @llvm.log2.f64(double %a)
+        ret double %tmp
+
+    @pure
+    @llvm
+    def __abs__(a: float) -> float:
+        declare double @llvm.fabs.f64(double %a)
+        %tmp = call double @llvm.fabs.f64(double %a)
+        ret double %tmp
+
+    @pure
+    @llvm
+    def __floor__(a: float) -> float:
+        declare double @llvm.floor.f64(double %a)
+        %tmp = call double @llvm.floor.f64(double %a)
+        ret double %tmp
+
+    @pure
+    @llvm
+    def __ceil__(a: float) -> float:
+        declare double @llvm.ceil.f64(double %a)
+        %tmp = call double @llvm.ceil.f64(double %a)
+        ret double %tmp
+
+    @pure
+    @llvm
+    def __trunc__(a: float) -> float:
+        declare double @llvm.trunc.f64(double %a)
+        %tmp = call double @llvm.trunc.f64(double %a)
+        ret double %tmp
+
+    @pure
+    @llvm
+    def rint(a: float) -> float:
+        declare double @llvm.rint.f64(double %a)
+        %tmp = call double @llvm.rint.f64(double %a)
+        ret double %tmp
+
+    @pure
+    @llvm
+    def nearbyint(a: float) -> float:
+        declare double @llvm.nearbyint.f64(double %a)
+        %tmp = call double @llvm.nearbyint.f64(double %a)
+        ret double %tmp
+
+    @pure
+    @llvm
+    def __round__(a: float) -> float:
+        declare double @llvm.round.f64(double %a)
+        %tmp = call double @llvm.round.f64(double %a)
+        ret double %tmp
+
+    @pure
+    @llvm
+    def __pow__(a: float, b: float) -> float:
+        declare double @llvm.pow.f64(double %a, double %b)
+        %tmp = call double @llvm.pow.f64(double %a, double %b)
+        ret double %tmp
+
+    @pure
+    @llvm
+    def min(a: float, b: float) -> float:
+        declare double @llvm.minnum.f64(double %a, double %b)
+        %tmp = call double @llvm.minnum.f64(double %a, double %b)
+        ret double %tmp
+
+    @pure
+    @llvm
+    def max(a: float, b: float) -> float:
+        declare double @llvm.maxnum.f64(double %a, double %b)
+        %tmp = call double @llvm.maxnum.f64(double %a, double %b)
+        ret double %tmp
+
+    @pure
+    @llvm
+    def copysign(a: float, b: float) -> float:
+        declare double @llvm.copysign.f64(double %a, double %b)
+        %tmp = call double @llvm.copysign.f64(double %a, double %b)
+        ret double %tmp
+
+    @pure
+    @llvm
+    def fma(a: float, b: float, c: float) -> float:
+        declare double @llvm.fma.f64(double %a, double %b, double %c)
+        %tmp = call double @llvm.fma.f64(double %a, double %b, double %c)
+        ret double %tmp
+
+    @nocapture
+    @llvm
+    def __atomic_xchg__(d: Ptr[float], b: float) -> None:
+        %tmp = atomicrmw xchg ptr %d, double %b seq_cst
+        ret {} {}
+
+    @nocapture
+    @llvm
+    def __atomic_add__(d: Ptr[float], b: float) -> float:
+        0:
+        %1 = load atomic i64, ptr %d monotonic, align 8
+        %2 = bitcast i64 %1 to double
+        %3 = fadd double %2, %b
+        %4 = bitcast double %3 to i64
+        %5 = cmpxchg weak ptr %d, i64 %1, i64 %4 seq_cst monotonic, align 8
+        %6 = extractvalue { i64, i1 } %5, 1
+        br i1 %6, label %15, label %7
+        7:                                                ; preds = %0, %7
+        %8 = phi { i64, i1 } [ %13, %7 ], [ %5, %0 ]
+        %9 = extractvalue { i64, i1 } %8, 0
+        %10 = bitcast i64 %9 to double
+        %11 = fadd double %10, %b
+        %12 = bitcast double %11 to i64
+        %13 = cmpxchg weak ptr %d, i64 %9, i64 %12 seq_cst monotonic, align 8
+        %14 = extractvalue { i64, i1 } %13, 1
+        br i1 %14, label %15, label %7
+        15:                                               ; preds = %7, %0
+        %16 = phi double [ %2, %0 ], [ %10, %7 ]
+        ret double %16
+
+    @nocapture
+    @llvm
+    def __atomic_sub__(d: Ptr[float], b: float) -> float:
+        0:
+        %1 = load atomic i64, ptr %d monotonic, align 8
+        %2 = bitcast i64 %1 to double
+        %3 = fsub double %2, %b
+        %4 = bitcast double %3 to i64
+        %5 = cmpxchg weak ptr %d, i64 %1, i64 %4 seq_cst monotonic, align 8
+        %6 = extractvalue { i64, i1 } %5, 1
+        br i1 %6, label %15, label %7
+        7:                                                ; preds = %0, %7
+        %8 = phi { i64, i1 } [ %13, %7 ], [ %5, %0 ]
+        %9 = extractvalue { i64, i1 } %8, 0
+        %10 = bitcast i64 %9 to double
+        %11 = fsub double %10, %b
+        %12 = bitcast double %11 to i64
+        %13 = cmpxchg weak ptr %d, i64 %9, i64 %12 seq_cst monotonic, align 8
+        %14 = extractvalue { i64, i1 } %13, 1
+        br i1 %14, label %15, label %7
+        15:                                               ; preds = %7, %0
+        %16 = phi double [ %2, %0 ], [ %10, %7 ]
+        ret double %16
+
+    def __hash__(self) -> int:
+        @nocapture
+        @C
+        def frexp(a: float, b: Ptr[Int[32]]) -> float: pass
+
+        HASH_BITS = 61
+        HASH_MODULUS = (1 << HASH_BITS) - 1
+        HASH_INF = 314159
+        HASH_NAN = 0
+        INF = 1.0 / 0.0
+        NAN = 0.0 / 0.0
+        v = self
+
+        if v == INF or v == -INF:
+            return HASH_INF if v > 0 else -HASH_INF
+        if v == NAN:
+            return HASH_NAN
+
+        _e = i32(0)
+        m = frexp(v, __ptr__(_e))
+        e = int(_e)
+
+        sign = 1
+        if m < 0:
+            sign = -1
+            m = -m
+
+        x = 0
+        while m:
+            x = ((x << 28) & HASH_MODULUS) | x >> (HASH_BITS - 28)
+            m *= 268435456.0  # 2**28
+            e -= 28
+            y = int(m)
+            m -= y
+            x += y
+            if x >= HASH_MODULUS:
+                x -= HASH_MODULUS
+
+        e = e % HASH_BITS if e >= 0 else HASH_BITS - 1 - ((-1 - e) % HASH_BITS)
+        x = ((x << e) & HASH_MODULUS) | x >> (HASH_BITS - e)
+
+        x = x * sign
+        if x == -1:
+            x = -2
+        return x
+
+    def __match__(self, obj: float) -> bool:
+        return self == obj
+
+    @property
+    def real(self) -> float:
+        return self
+
+    @property
+    def imag(self) -> float:
+        return 0.0
+
+@extend
+class float32:
+    @pure
+    @llvm
+    def __new__(self: float) -> float32:
+        %0 = fptrunc double %self to float
+        ret float %0
+
+    def __new__(what: float32) -> float32:
+        return what
+
+    def __new__() -> float32:
+        return float32.__new__(0.0)
+
+    def __repr__(self) -> str:
+        return self.__float__().__repr__()
+
+    def __format__(self, format_spec: str) -> str:
+        return self.__float__().__format(format_spec)
+
+    def __copy__(self) -> float32:
+        return self
+
+    def __deepcopy__(self) -> float32:
+        return self
+
+    @pure
+    @llvm
+    def __int__(self) -> int:
+        %0 = fptosi float %self to i64
+        ret i64 %0
+
+    @pure
+    @llvm
+    def __float__(self) -> float:
+        %0 = fpext float %self to double
+        ret double %0
+
+    @pure
+    @llvm
+    def __bool__(self) -> bool:
+        %0 = fcmp one float %self, 0.000000e+00
+        %1 = zext i1 %0 to i8
+        ret i8 %1
+
+    def __pos__(self) -> float32:
+        return self
+
+    @pure
+    @llvm
+    def __neg__(self) -> float32:
+        %0 = fneg float %self
+        ret float %0
+
+    @pure
+    @commutative
+    @llvm
+    def __add__(a: float32, b: float32) -> float32:
+        %tmp = fadd float %a, %b
+        ret float %tmp
+
+    @pure
+    @llvm
+    def __sub__(a: float32, b: float32) -> float32:
+        %tmp = fsub float %a, %b
+        ret float %tmp
+
+    @pure
+    @commutative
+    @llvm
+    def __mul__(a: float32, b: float32) -> float32:
+        %tmp = fmul float %a, %b
+        ret float %tmp
+
+    def __floordiv__(self, other: float32) -> float:
+        return self.__truediv__(other).__floor__()
+
+    @pure
+    @llvm
+    def __truediv__(a: float32, b: float32) -> float32:
+        %tmp = fdiv float %a, %b
+        ret float %tmp
+
+    @pure
+    @llvm
+    def __mod__(a: float32, b: float32) -> float32:
+        %tmp = frem float %a, %b
+        ret float %tmp
+
+    def __divmod__(self, other: float32) -> Tuple[float32, float32]:
+        mod = self % other
+        div = (self - mod) / other
+        if mod:
+            if (other < 0) != (mod < 0):
+                mod += other
+                div -= 1.0
+        else:
+            mod = (0.0).copysign(other)
+
+        floordiv = 0.0
+        if div:
+            floordiv = div.__floor__()
+            if div - floordiv > 0.5:
+                floordiv += 1.0
+        else:
+            floordiv = (0.0).copysign(self / other)
+
+        return (floordiv, mod)
+
+    @pure
+    @llvm
+    def __eq__(a: float32, b: float32) -> bool:
+        %tmp = fcmp oeq float %a, %b
+        %res = zext i1 %tmp to i8
+        ret i8 %res
+
+    @pure
+    @llvm
+    def __ne__(a: float32, b: float32) -> bool:
+        entry:
+            %tmp = fcmp one float %a, %b
+            %res = zext i1 %tmp to i8
+            ret i8 %res
+
+    @pure
+    @llvm
+    def __lt__(a: float32, b: float32) -> bool:
+        %tmp = fcmp olt float %a, %b
+        %res = zext i1 %tmp to i8
+        ret i8 %res
+
+    @pure
+    @llvm
+    def __gt__(a: float32, b: float32) -> bool:
+        %tmp = fcmp ogt float %a, %b
+        %res = zext i1 %tmp to i8
+        ret i8 %res
+
+    @pure
+    @llvm
+    def __le__(a: float32, b: float32) -> bool:
+        %tmp = fcmp ole float %a, %b
+        %res = zext i1 %tmp to i8
+        ret i8 %res
+
+    @pure
+    @llvm
+    def __ge__(a: float32, b: float32) -> bool:
+        %tmp = fcmp oge float %a, %b
+        %res = zext i1 %tmp to i8
+        ret i8 %res
+
+    @pure
+    @llvm
+    def sqrt(a: float32) -> float32:
+        declare float @llvm.sqrt.f32(float %a)
+        %tmp = call float @llvm.sqrt.f32(float %a)
+        ret float %tmp
+
+    @pure
+    @llvm
+    def sin(a: float32) -> float32:
+        declare float @llvm.sin.f32(float %a)
+        %tmp = call float @llvm.sin.f32(float %a)
+        ret float %tmp
+
+    @pure
+    @llvm
+    def cos(a: float32) -> float32:
+        declare float @llvm.cos.f32(float %a)
+        %tmp = call float @llvm.cos.f32(float %a)
+        ret float %tmp
+
+    @pure
+    @llvm
+    def exp(a: float32) -> float32:
+        declare float @llvm.exp.f32(float %a)
+        %tmp = call float @llvm.exp.f32(float %a)
+        ret float %tmp
+
+    @pure
+    @llvm
+    def exp2(a: float32) -> float32:
+        declare float @llvm.exp2.f32(float %a)
+        %tmp = call float @llvm.exp2.f32(float %a)
+        ret float %tmp
+
+    @pure
+    @llvm
+    def log(a: float32) -> float32:
+        declare float @llvm.log.f32(float %a)
+        %tmp = call float @llvm.log.f32(float %a)
+        ret float %tmp
+
+    @pure
+    @llvm
+    def log10(a: float32) -> float32:
+        declare float @llvm.log10.f32(float %a)
+        %tmp = call float @llvm.log10.f32(float %a)
+        ret float %tmp
+
+    @pure
+    @llvm
+    def log2(a: float32) -> float32:
+        declare float @llvm.log2.f32(float %a)
+        %tmp = call float @llvm.log2.f32(float %a)
+        ret float %tmp
+
+    @pure
+    @llvm
+    def __abs__(a: float32) -> float32:
+        declare float @llvm.fabs.f32(float %a)
+        %tmp = call float @llvm.fabs.f32(float %a)
+        ret float %tmp
+
+    @pure
+    @llvm
+    def __floor__(a: float32) -> float32:
+        declare float @llvm.floor.f32(float %a)
+        %tmp = call float @llvm.floor.f32(float %a)
+        ret float %tmp
+
+    @pure
+    @llvm
+    def __ceil__(a: float32) -> float32:
+        declare float @llvm.ceil.f32(float %a)
+        %tmp = call float @llvm.ceil.f32(float %a)
+        ret float %tmp
+
+    @pure
+    @llvm
+    def __trunc__(a: float32) -> float32:
+        declare float @llvm.trunc.f32(float %a)
+        %tmp = call float @llvm.trunc.f32(float %a)
+        ret float %tmp
+
+    @pure
+    @llvm
+    def rint(a: float32) -> float32:
+        declare float @llvm.rint.f32(float %a)
+        %tmp = call float @llvm.rint.f32(float %a)
+        ret float %tmp
+
+    @pure
+    @llvm
+    def nearbyint(a: float32) -> float32:
+        declare float @llvm.nearbyint.f32(float %a)
+        %tmp = call float @llvm.nearbyint.f32(float %a)
+        ret float %tmp
+
+    @pure
+    @llvm
+    def __round__(a: float32) -> float32:
+        declare float @llvm.round.f32(float %a)
+        %tmp = call float @llvm.round.f32(float %a)
+        ret float %tmp
+
+    @pure
+    @llvm
+    def __pow__(a: float32, b: float32) -> float32:
+        declare float @llvm.pow.f32(float %a, float %b)
+        %tmp = call float @llvm.pow.f32(float %a, float %b)
+        ret float %tmp
+
+    @pure
+    @llvm
+    def min(a: float32, b: float32) -> float32:
+        declare float @llvm.minnum.f32(float %a, float %b)
+        %tmp = call float @llvm.minnum.f32(float %a, float %b)
+        ret float %tmp
+
+    @pure
+    @llvm
+    def max(a: float32, b: float32) -> float32:
+        declare float @llvm.maxnum.f32(float %a, float %b)
+        %tmp = call float @llvm.maxnum.f32(float %a, float %b)
+        ret float %tmp
+
+    @pure
+    @llvm
+    def copysign(a: float32, b: float32) -> float32:
+        declare float @llvm.copysign.f32(float %a, float %b)
+        %tmp = call float @llvm.copysign.f32(float %a, float %b)
+        ret float %tmp
+
+    @pure
+    @llvm
+    def fma(a: float32, b: float32, c: float32) -> float32:
+        declare float @llvm.fma.f32(float %a, float %b, float %c)
+        %tmp = call float @llvm.fma.f32(float %a, float %b, float %c)
+        ret float %tmp
+
+    @nocapture
+    @llvm
+    def __atomic_xchg__(d: Ptr[float32], b: float32) -> None:
+        %tmp = atomicrmw xchg ptr %d, float %b seq_cst
+        ret {} {}
+
+    @nocapture
+    @llvm
+    def __atomic_add__(d: Ptr[float32], b: float32) -> float32:
+        0:
+        %1 = load atomic i32, ptr %d monotonic, align 4
+        %2 = bitcast i32 %1 to float
+        %3 = fadd float %2, %b
+        %4 = bitcast float %3 to i32
+        %5 = cmpxchg weak ptr %d, i32 %1, i32 %4 seq_cst monotonic, align 4
+        %6 = extractvalue { i32, i1 } %5, 1
+        br i1 %6, label %15, label %7
+        7:                                                ; preds = %0, %7
+        %8 = phi { i32, i1 } [ %13, %7 ], [ %5, %0 ]
+        %9 = extractvalue { i32, i1 } %8, 0
+        %10 = bitcast i32 %9 to float
+        %11 = fadd float %10, %b
+        %12 = bitcast float %11 to i32
+        %13 = cmpxchg weak ptr %d, i32 %9, i32 %12 seq_cst monotonic, align 4
+        %14 = extractvalue { i32, i1 } %13, 1
+        br i1 %14, label %15, label %7
+        15:                                               ; preds = %7, %0
+        %16 = phi float [ %2, %0 ], [ %10, %7 ]
+        ret float %16
+
+    @nocapture
+    @llvm
+    def __atomic_sub__(d: Ptr[float32], b: float32) -> float32:
+        0:
+        %1 = load atomic i32, ptr %d monotonic, align 4
+        %2 = bitcast i32 %1 to float
+        %3 = fsub float %2, %b
+        %4 = bitcast float %3 to i32
+        %5 = cmpxchg weak ptr %d, i32 %1, i32 %4 seq_cst monotonic, align 4
+        %6 = extractvalue { i32, i1 } %5, 1
+        br i1 %6, label %15, label %7
+        7:                                                ; preds = %0, %7
+        %8 = phi { i32, i1 } [ %13, %7 ], [ %5, %0 ]
+        %9 = extractvalue { i32, i1 } %8, 0
+        %10 = bitcast i32 %9 to float
+        %11 = fsub float %10, %b
+        %12 = bitcast float %11 to i32
+        %13 = cmpxchg weak ptr %d, i32 %9, i32 %12 seq_cst monotonic, align 4
+        %14 = extractvalue { i32, i1 } %13, 1
+        br i1 %14, label %15, label %7
+        15:                                               ; preds = %7, %0
+        %16 = phi float [ %2, %0 ], [ %10, %7 ]
+        ret float %16
+
+    def __hash__(self) -> int:
+        return self.__float__().__hash__()
+
+    def __match__(self, obj: float32) -> bool:
+        return self == obj
+
+@extend
+class float:
+    def __suffix_f32__(double) -> float32:
+        return float32.__new__(double)
+
+f32 = float32

@@ -1,37 +1,43 @@
 process DEDUP {
     tag "${sampleID}"
     label 'process_low'
-    //publishDir "${params.outdir}/processedBam/${sampleID}",
-    //    mode: "${params.publish_dir_mode}",
-    //    enabled: params.outdir as boolean
 
     input:
-    tuple val(sampleID), path(inputBam)
-    tuple val(sampleID), path(inputBamBai)
+    tuple val(sampleID), path(inputBam), path(inputBamBai)
 
     output:
-    tuple val(sampleID), env(ratio), emit: dupRatio
-    //tuple val(sampleID), val(sampleName), path("${sampleID}.final.bam"), emit: finalBam
-    //tuple val(sampleID), val(sampleName), path("${sampleID}.final.bam.bai"), emit: finalBai
+    tuple val(sampleID), path("${sampleID}.mark_dup.metrics"),  emit: dedup_metrics
+    tuple val(sampleID), path("${sampleID}.mapping_stats.tsv"), emit: bam_stats
 
     script:
     """
     ## Mark duplicates
     export TMPDIR="./"
-    sortedBAM=\$(mktemp -p ./ sorted.XXXXXX.bam)
-    samtools sort -@ $task.cpus ${inputBam} > \$sortedBAM
-    mkdir picard_tmp
-    picard MarkDuplicates \\
-        TMP_DIR=\$(pwd)/picard_tmp \\
-        INPUT=\$sortedBAM OUTPUT=${sampleID}.mark_dup.bam METRICS_FILE=${sampleID}.mark_dup.metrics \\
-        VALIDATION_STRINGENCY=LENIENT ASSUME_SORT_ORDER=coordinate
-    ## Filter alignments (remove duplicates)
-    ##samtools view -@ $task.cpus -b -f 0x2 -F 0x4 -F 0x8 -F 0x100 -F 0x800 -F 0x400 -q 30 ${sampleID}.mark_dup.bam |
-    ##    samtools sort -@ $task.cpus > ${sampleID}.final.bam
-    ##samtools index ${sampleID}.final.bam
+    ##mkdir picard_tmp
+    ##picard MarkDuplicates \\
+    ##    --TMP_DIR ./picard_tmp \\
+    ##    --INPUT ${inputBam} \\
+    ##    --OUTPUT ${sampleID}.mark_dup.bam \\
+    ##    --METRICS_FILE ${sampleID}.mark_dup.metrics \\
+    ##    --VALIDATION_STRINGENCY LENIENT \\
+    ##    --ASSUME_SORT_ORDER coordinate
+
+    ## Use samtools markdup instead of picard
+    ## --no-multi-dup speed up the process
+    samtools markdup -@ $task.cpus \\
+                     -s \\
+                     -f ${sampleID}.mark_dup.metrics \\
+                     -m t \\
+                     -t \\
+                     --barcode-tag CB \\
+                     --no-multi-dup \\
+                     ${inputBam} \\
+                     ${sampleID}.mark_dup.bam
+    ## Generate bam stats
+    samtools stats -@ $task.cpus ${sampleID}.mark_dup.bam > ${sampleID}.mapping_stats.tsv
+ 
     ## remove sorted bam to save space
-    rm \$sortedBAM
     rm ${sampleID}.mark_dup.bam
-    ratio=\$(awk '\$0~/^## METRICS CLASS/{getline; getline; pos=NF-1; print \$pos}' ${sampleID}.mark_dup.metrics)
+    ##ratio=\$(awk '\$0~/^## METRICS CLASS/{getline; getline; pos=NF-1; print \$pos}' ${sampleID}.mark_dup.metrics)
     """
 }

@@ -1,0 +1,47 @@
+name: starscope_scATAC_env
+channels:
+  - conda-forge
+  - bioconda
+  - defaults
+dependencies:
+  - samtools>=1.9
+  - bedtools>=2.25
+  - htslib
+  - bwa-mem2==2.2.1
+  - cutadapt>=3.5
+  - fastx_toolkit
+  - fastqc>=0.11.9
+  - r-base>=4.2
+  - r-dplyr
+  - r-ggplot2
+  - r-data.table
+  - r-flexdashboard
+  - r-bslib==0.4.2
+  - r-rmarkdown
+  - r-scales
+  - r-tidyverse
+  - r-plotly
+  - r-kableextra
+  - r-jsonlite
+  - r-dt
+  - r-future
+  - r-seurat==4.4.0
+  - r-seuratobject==4.1.4
+  - r-matrix==1.6_1.1
+  - r-signac
+  - r-reticulate
+  - r-optparse
+  - bioconductor-limma
+  - bioconductor-genomicranges
+  - bioconductor-rtracklayer
+  - gawk
+  - pigz
+  - gzip
+  - coreutils
+  - jq
+  - r-rhpcblasctl
+  - parallel>=20230922
+  - picard
+  - sinto
+  - multiqc
+  - numpy

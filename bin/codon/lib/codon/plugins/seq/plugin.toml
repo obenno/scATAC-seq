@@ -1,0 +1,11 @@
+[about]
+name = "Seq"
+description = "a high-performance language for bioinformatics"
+version = "0.11.3"
+url = "https://seq-lang.org"
+supported = ">=0.15.4"
+
+[library]
+cpp = "build/libseq"
+codon = "stdlib"
+link = ["{root}/build/libseq_static.a"]

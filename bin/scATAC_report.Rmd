@@ -12,24 +12,12 @@ params:
   nCPUs: 6
   nMem: 10000000000.0
   sampleName: NULL
-  fragmentFile: NULL
-  refGenome: "hg38"
-  refGTF: NULL
-  genomeSize: NULL
-  macs2: NULL
-  minCell: 10
-  minFeature: 200
-  nCount_min: 3000
-  nCount_max: 20000
-  FRiP_cutoff: 0.15
-  blacklist_fraction_cutoff: 0.05
-  nucleosome_signal_cutoff: 4
-  TSS_enrichment_cutoff: 2
-  readReport: NULL
-  bowtie2_report: NULL
+  stats_tsv: NULL
+  raw_cells: NULL
+  raw_meta: NULL
+  obj_filtered: NULL
+  macs_peaks: NULL
   saturation_json: NULL
-  libraryComplexity: NULL
-  dupRatio: NULL
 ---
 
 ```{r include=FALSE}
@@ -46,6 +34,7 @@ library(patchwork)
 library(future)
 library(plotly)
 library(jsonlite)
+library(reticulate)
 
 set.seed(1234)
 plan("multisession", workers = as.numeric(params$nCPUs))
@@ -84,113 +73,17 @@ document.querySelector(".navbar").classList.add("pt-1");
 document.querySelector(".navbar").classList.add("pb-1");
 ```
 
-```{r include=FALSE}
-## Read gene annotation from GTF
-annotations <- import(params$refGTF)
-annotations$gene_biotype <- annotations$gene_type
-## Filter annotations by gene_biotype
-annotations <- annotations[annotations$gene_biotype %in% c("protein_coding", "lincRNA", "rRNA", "processed_transcript")]
+```{r preprocess, include=FALSE}
+obj_filtered <- readRDS(params$obj_filtered)
+obj_filtered$orig.ident <- params$sampleName
 
-if(params$refGenome == "hg38"){
-    ##library(EnsDb.Hsapiens.v86)
-    ##ensdb = EnsDb.Hsapiens.v86
-    genomeSize = 2.7e9
-    blackListObj = blacklist_hg38_unified
-}else if(params$refGenome == "hg19"){
-    ##library(EnsDb.Hsapiens.v75)
-    ##ensdb = EnsDb.Hsapiens.v75
-    genomeSize = 2.7e9
-    blackListObj = blacklist_hg19
-}else if(params$refGenome == "mm9"){
-    genomeSize = 1.87e9
-    blackListObj = blacklist_mm9
-}else if(params$refGenome == "mm10"){
-    ##library(EnsDb.Mmusculus.v79)
-    ##ensdb = EnsDb.Mmusculus.v79
-    genomeSize = 1.87e9
-    blackListObj = blacklist_mm10
+tssPlot <- TSSPlot(obj_filtered, group.by = 'high.tss') + NoLegend()
 
-}else if(params$refGenome == "hg38-mm10"){
-    genomeSize = 2.7e9+1.87e9
-    seqlevels(blacklist_hg38_unified) <- paste0("GRCh38_", seqlevels(blacklist_hg38_unified))
-    seqlevels(blacklist_mm10) <- paste0("mm10___", seqlevels(blacklist_mm10))
-    blackListObj = c(blacklist_hg38_unified, blacklist_mm10)
-}else{
-    ## default load hg38
-    ##library(EnsDb.Hsapiens.v86)
-    ##ensdb = EnsDb.Hsapiens.v86
-    genomeSize = 2.7e9
-    blackListObj = blacklist_hg38_unified
-}
-
-## overwrite genomeSize with input parameter
-if(!is.null(params$genomeSize) && params$genomeSize !=""){
-    genomeSize = params$genomeSize
-}
-
-## Perform analysis
-frag <- CreateFragmentObject(params$fragmentFile)
-macs_peaks <- CallPeaks(frag, macs2.path = params$macs2, effective.genome.size = genomeSize)
-counts <- FeatureMatrix(fragments = frag, features = macs_peaks, 
-                        sep= c(":", "-"))
-                        
-chrom_assay <- CreateChromatinAssay(
-  counts = counts,
-  sep = c(":", "-"),
-  ##genome = params$refGenome,
-  fragments = params$fragmentFile,
-  min.cells = as.numeric(params$minCell),
-  min.features = as.numeric(params$minFeature)
-)
-
-scATAC_obj <- CreateSeuratObject(
-  counts = chrom_assay,
-  assay = "peaks"
-)
-
-scATAC_obj$orig.ident <- params$sampleName
-
-##annotations <- GetGRangesFromEnsDb(ensdb = ensdb)
-##seqlevelsStyle(annotations) <- 'UCSC'
-Annotation(scATAC_obj) <- annotations
-
-# compute nucleosome signal score per cell
-scATAC_obj <- NucleosomeSignal(object = scATAC_obj)
-
-# compute TSS enrichment score per cell
-scATAC_obj <- TSSEnrichment(object = scATAC_obj, fast = FALSE)
-
-scATAC_obj$high.tss <- ifelse(scATAC_obj$TSS.enrichment > as.numeric(params$TSS_enrichment_cutoff), 'High', 'Low')
-tssPlot <- TSSPlot(scATAC_obj, group.by = 'high.tss') + NoLegend()
-
-scATAC_obj$nucleosome_group <- ifelse(scATAC_obj$nucleosome_signal > as.numeric(params$nucleosome_signal_cutoff), paste0('NS > ', params$nucleosome_signal_cutoff), paste0('NS < ', params$nucleosome_signal_cutoff))
-
-fragLenPlot <- FragmentHistogram(object = scATAC_obj, group.by = 'nucleosome_group', region=paste0(seqlevels(annotations)[1],'-1-200000000'))
-
-## Calculate fragments in peaks for each cell
-total_fragments <- CountFragments(params$fragmentFile) %>%
-    dplyr::filter(CB %in% colnames(scATAC_obj)) %>% dplyr::select(CB, frequency_count)
-
-scATAC_obj@meta.data <- scATAC_obj@meta.data %>%
-    rownames_to_column("CB") %>%
-    left_join(total_fragments, by="CB") %>%
-    dplyr::rename("fragments" = frequency_count) %>%
-    column_to_rownames("CB")
-
-scATAC_obj <- FRiP(
-  object = scATAC_obj,
-  assay = 'peaks',
-  total.fragments = 'fragments'
-)
-
-scATAC_obj$blacklist_fraction <- FractionCountsInRegion(
-  object = scATAC_obj,
-  assay = 'peaks',
-  regions = blackListObj
-)
+## Chr1 fragments length distribution
+fragLenPlot <- FragmentHistogram(object = obj_filtered, group.by = 'nucleosome_group', region=paste0(seqlevels(Annotation(obj_filtered))[1],'-1-200000000'))
 
 qcPlot <- VlnPlot(
-  object = scATAC_obj,
+  object = obj_filtered,
   features = c('FRiP', 'nCount_peaks',
                'TSS.enrichment', 'blacklist_fraction', 'nucleosome_signal'),
   pt.size = 0.1,
@@ -198,52 +91,43 @@ qcPlot <- VlnPlot(
   group.by = "orig.ident"
 )
 
-## Filter data with naive criteria
-scATAC_obj <- subset(
-  x = scATAC_obj,
-  subset = nCount_peaks > as.numeric(params$nCount_min) &
-    nCount_peaks < as.numeric(params$nCount_max) &
-    FRiP > as.numeric(params$FRiP_cutoff) &
-    blacklist_fraction < as.numeric(params$blacklist_fraction_cutoff) &
-    nucleosome_signal < as.numeric(params$nucleosome_signal_cutoff) &
-    TSS.enrichment > as.numeric(params$TSS_enrichment_cutoff)
-)
-message("Final cells: ", nrow(scATAC_obj@meta.data))
 
-cells <- colnames(scATAC_obj)
+## Filter data with otsu threshold of nCount_peaks, and with other naive criterias
+cells <- colnames(obj_filtered)
 
-d <- colSums(counts) %>% as.data.frame()
-colnames(d) <- "counts"
-d <- d %>% dplyr::arrange(desc(counts)) %>%
-    dplyr::mutate(idx=1:nrow(d)) %>%
-    rownames_to_column("CB") %>%
-    mutate(
-        type=case_when(
-            `CB` %in% cells ~ "cells",
-            TRUE ~ "background"
-        )
-    )
+raw_cells <- read_tsv(params$raw_cells, col_names = FALSE) %>% pull()
+
+d <- read_tsv(params$raw_meta) ## counts = fragsOverlapPeaks
+
+d <- d %>% dplyr::arrange(desc(fragsOverlapPeaks)) %>%
+    dplyr::mutate(idx=1:nrow(d))
 
 ## Do not perform clustering when there are too few cells
-
 if(length(cells)>=150){
-scATAC_obj <- RunTFIDF(scATAC_obj)
-scATAC_obj <- FindTopFeatures(scATAC_obj, min.cutoff = 'q0')
-scATAC_obj <- RunSVD(scATAC_obj)
-
-scATAC_obj <- RunUMAP(object = scATAC_obj, reduction = 'lsi', dims = 2:30)
-scATAC_obj <- FindNeighbors(object = scATAC_obj, reduction = 'lsi', dims = 2:30)
-scATAC_obj <- FindClusters(object = scATAC_obj, verbose = FALSE, algorithm = 3)
-clusterPlot <- DimPlot(object = scATAC_obj, label = TRUE) + NoLegend()
+    clusterPlot <- DimPlot(object = obj_filtered, label = TRUE) + NoLegend()
 }
-saveRDS(scATAC_obj, file=paste0(params$sampleName, ".rds"))
+```
+
+```{r read_stats, include = FALSE}
+stats <- read_tsv(params$stats_tsv, col_names=FALSE)
+colnames(stats) <- c("Term", "value")
+## Add more stats about cells
+cellFrag_median <- obj_filtered[["fragments"]] %>% pull(fragments) %>% median() %>% as.integer()
+cellFrag_mean <- obj_filtered[["fragments"]] %>% pull(fragments) %>% mean() %>% as.integer()
+cellFRiP_median <- obj_filtered[["FRiP"]] %>% pull(FRiP) %>% median()
+cellFRiP_mean <- obj_filtered[["FRiP"]] %>% pull(FRiP) %>% mean()
+stats <- stats %>% 
+    add_row(Term = "cellFrag_median", value = as.character(cellFrag_median), .after = 2) %>%
+    add_row(Term = "cellFrag_mean", value = as.character(cellFrag_mean), .after = 3) %>%
+    add_row(Term = "cellFRiP_median", value = as.character(cellFRiP_median), .after = 4) %>%
+    add_row(Term = "cellFRiP_mean", value = as.character(cellFRiP_mean), .after=5)
 ```
 
 Analysis Result {data-orientation=rows}
 ====================
 
 
-<h2>Sample: `r params$sampleName` (`r params$refGenome`)</h2>
+<h2>Sample: `r params$sampleName`</h2>
 
 Row
 ----------
@@ -257,14 +141,12 @@ valueBox(scales::label_comma()(length(cells)), caption = "Estimated number of ce
 ### Median of Total Fragments in Cells
 
 ```{r}
-cellFrag_median <- scATAC_obj[["fragments"]] %>% pull(fragments) %>% median() %>% as.integer()
 valueBox(scales::label_comma()(cellFrag_median), caption = "Median fragments per cell", icon="fa-chart-bar", color="danger")
 ```
 
 ### Median FRiP of Cells
 
 ```{r}
-cellFRiP_median <- scATAC_obj[["FRiP"]] %>% pull(FRiP) %>% median()
 valueBox(scales::label_percent(0.01)(cellFRiP_median), caption = "Median fraction of fragments overlapping peaks", icon="fa-barcode", color="info")
 ```
 
@@ -274,15 +156,14 @@ Row
 ### Cells
 
 ```{r}
-cellFrag_mean <- scATAC_obj[["fragments"]] %>% pull(fragments) %>% mean() %>% as.integer()
-cellFRiP_mean <- scATAC_obj[["FRiP"]] %>% pull(FRiP) %>% mean()
+
 tribble(
   ~"", ~"",
   "Estimated number of cells", scales::label_comma()(length(cells)),
   "Mean fragments per cell", scales::label_comma()(cellFrag_mean),
   "Median fragments per cell", scales::label_comma()(cellFrag_median),
   "Mean of FRiP in cells", scales::label_percent(0.01)(cellFRiP_mean),
-  "Median of FRiP in cells", scales::label_percent(0.01)(cellFRiP_median),
+  "Median of FRiP in cells", scales::label_percent(0.01)(cellFRiP_median)
   ##"Fraction of transposition events in peaks in cells", "100",
 ) %>% kbl() %>% kable_paper("hover", html_font = "arial, helvetica, sans-serif") %>%
   column_spec(1, bold = T)
@@ -291,26 +172,23 @@ tribble(
 ### Sequencing
 
 ```{r}
-if(!is.null(params$readReport)){
-  readReport <- read_json(params$readReport)
-}else{
-  readReport <- list(
-    "rawReadPairs"=NULL,
-    "validBarcode_ratio"=NULL,
-    "Q30_read1"=NULL,
-    "Q30_read2"=NULL
-  )
-}
-
-validBarcode_rate <- as.numeric(readReport$validBarcode_readCount)/as.numeric(readReport$rawReadPairs)
-validBarcode_rate <- scales::label_percent(0.01)(validBarcode_rate)
+valid_barcode_reads <- stats %>% filter(Term=="valid_barcode_reads") %>% pull(value) %>% as.numeric()
+total_input_reads <- stats %>% filter(Term=="total_input_reads") %>% pull(value) %>% as.numeric()
+me_containing_reads <- stats %>% filter(Term == "me_containing_reads") %>% pull(value) %>% as.numeric()
+me_read_ratio <- me_containing_reads/total_input_reads
+valid_barcode_ratio <- valid_barcode_reads/total_input_reads
+barcode_q30_ratio <- stats %>% filter(Term == "barcode_q30_ratio") %>% pull(value) %>% as.numeric()
+r1_q30_ratio <- stats %>% filter(Term=="r1_q30_ratio") %>% pull(value) %>% as.numeric()
+r2_q30_ratio <- stats %>% filter(Term=="r2_q30_ratio") %>% pull(value) %>% as.numeric()
 
 tribble(
   ~"", ~"",
-  "Raw read pairs", scales::label_comma()(as.numeric(readReport$rawReadPairs)),
-  "Valid barcodes", scales::label_percent()(as.numeric(readReport$validBarcode_ratio)),
-  "Q30 bases in read 1", readReport$Q30_read1,
-  "Q30 bases in read 2", readReport$Q30_read2
+  "Raw read pairs", label_comma()(total_input_reads),
+  "Valid barcodes", label_percent(0.01)(valid_barcode_ratio),
+  "ME containing read pairs", label_percent(0.01)(me_read_ratio),
+  "Q30 bases in barcode", label_percent(0.01)(barcode_q30_ratio),
+  "Q30 bases in read 1", label_percent(0.01)(r1_q30_ratio),
+  "Q30 bases in read 2", label_percent(0.01)(r2_q30_ratio)
 ) %>% kbl() %>% kable_paper("hover", html_font = "arial, helvetica, sans-serif") %>%
   column_spec(1, bold = T)
 ```
@@ -321,16 +199,8 @@ Row {data-height=500}
 ### Cells Knee Plot
 
 ```{r}
-##kneePlot <- ggplot(d, aes(x=idx, y=counts, color=type))+geom_point()+
-##    scale_x_log10()+scale_y_log10() +
-##    scale_color_manual(values = c("grey", "steelblue")) +
-##    theme_bw()+
-##    theme(panel.grid = element_blank(),
-##          legend.position = "none")
-##kneePlot + xlab("Barcode") + ylab("Fragments")
-
-fig <- plot_ly(data = d, x = ~idx, y = ~counts, type = 'scatter', mode = 'lines',
-               color = ~type, colors = c('grey', '#002366'),
+fig <- plot_ly(data = d, x = ~idx, y = ~fragsOverlapPeaks, type = 'scatter', mode = 'lines',
+               color = ~group, colors = c('grey', '#002366'),
                hovertemplate = 'Fragments: %{y}<extra>%{fullData.name}</extra>',
                line = list(width = 3),
                height = 400, width = 360)
@@ -342,11 +212,12 @@ config_plotly_fig(fig) %>% toWebGL()
 ### Cells Fragments Distribution
 
 ```{r}
-ggplot(d, aes(counts, color=type, fill=type)) + geom_density(alpha=0.4, adjust = 5)+
+p <- ggplot(d, aes(fragments, color=group, fill=group)) + geom_density(alpha=0.4, adjust = 5)+
   scale_x_log10() + xlab("Fragments") + theme_bw() + 
   theme(panel.grid=element_blank(), legend.position=c(0.8,0.9), legend.title=element_blank()) +
   scale_fill_manual(values=c("grey", "steelblue")) +
   scale_color_manual(values=c("grey", "steelblue"))
+ggplotly(p) %>% config_plotly_fig() %>% toWebGL()
 ```
 
 Row {data-height=600}
@@ -356,20 +227,6 @@ Row {data-height=600}
 
 ```{r fig.width=15, fig.height=7, fig.fullwidth=TRUE, out.width="100%"}
 qcPlot
-##qcPlot_list <- VlnPlot(
-##  object = scATAC_obj,
-##  features = c('FRiP', 'nCount_peaks',
-##               'TSS.enrichment', 'blacklist_fraction', 'nucleosome_signal'),
-##  pt.size = 0.1,
-##  ncol = 5,
-##  combine = FALSE
-##)
-
-##for(i in length(qcPlot_list)){
-##  qcPlot_list[[i]] %>% ggplotly()
-##}
-
-##ggplotly(qcPlot_list[[1]])
 ```
 
 Row {data-height=600}
@@ -389,8 +246,8 @@ if(length(cells)>=150){
 
 ```{r}
 if(length(cells)>=150){
-  scATAC_obj[["logFragments"]] <- log10(scATAC_obj[["fragments"]])
-  depthPlot <- FeaturePlot(object = scATAC_obj, features = 'logFragments') + scale_color_continuous(name="log10 Fragments", type = "viridis", direction = 1) + labs(title = NULL)
+  obj_filtered[["logFragments"]] <- log10(obj_filtered[["fragments"]])
+  depthPlot <- FeaturePlot(object = obj_filtered, features = 'logFragments') + scale_color_continuous(name="log10 Fragments", type = "viridis", direction = 1) + labs(title = NULL)
   depthPlot %>% ggplotly() %>% config_plotly_fig() %>% toWebGL()
 }else{
   cat("Too few cells\n")
@@ -406,22 +263,22 @@ Row {data-height=500}
 ### Library Complexity
 
 ```{r echo=FALSE}
-read_tsv(params$libraryComplexity) %>%
-    dplyr::rename(
-       "NRF" = `m0/mt`,
-       "PBC1" = `m1/m0`,
-       "PBC2" = `m1/m2`
-    ) %>% 
-    select(NRF, PBC1, PBC2) %>% t() %>% 
-    as.data.frame() %>% rownames_to_column("Measure") %>% 
-    dplyr::rename(Value=V1) %>% 
-    mutate(Value = scales::label_number(0.001)(Value)) %>%
-    kbl() %>% 
-    kable_paper("hover", html_font = "arial, helvetica, sans-serif") %>%
-    column_spec(1, bold = T)
+pbc1 <- stats %>% filter(Term=="pbc1") %>% pull(value) %>% as.numeric()
+pbc2 <- stats %>% filter(Term=="pbc2") %>% pull(value) %>% as.numeric()
+nrf <- stats %>% filter(Term=="nrf") %>% pull(value) %>% as.numeric()
+duplicationReads <- stats %>% filter(Term=="duplicated_reads") %>% pull(value) %>% as.numeric()
+duplicationRatio <- duplicationReads/me_containing_reads
+tribble(
+  ~"", ~"",
+  "PBC1", label_number(0.01)(pbc1),
+  "PBC2", label_number(0.01)(pbc2),
+  "NRF", label_number(0.01)(nrf),
+  "Duplication", label_percent(0.01)(duplicationRatio)
+) %>%
+kbl() %>% 
+kable_paper("hover", html_font = "arial, helvetica, sans-serif") %>%
+column_spec(1, bold = T)
 ```
-
-Duplcation Ratio: `r params$dupRatio %>% as.numeric %>% scales::percent(0.01)`
 
 ### Sequencing Saturation
 
@@ -437,6 +294,7 @@ if(!is.null(params$saturation_json)){
 plot_ly(saturation_data, x= ~seqDep, y= ~uniqueFrags, text= ~saturation,
        type = 'scatter', mode = 'lines',
        hovertemplate = 'Read Pairs: %{x}<br>Unique Fragments: %{y}<br>Saturation: %{text}<extra></extra>') %>%
+    layout(xaxis = list(title = 'Sequencing Read Depth'), yaxis = list(title = 'Total Fragments')) %>%
     config_plotly_fig() %>%
     toWebGL()
 ```
@@ -447,31 +305,24 @@ Row
 ### Mapping Result
 
 ```{r}
-if(!is.null(params$bowtie2_report)){
-  mappingReport <- read_json(params$bowtie2_report)
-}else{
-  mappingReport <- list(
-    "totalFragments"=NULL,
-    "uniqueReadPair"=NULL,
-    "uniqueMappingRate"=NULL,
-    "totalMappingRate"=NULL
-  )
-}
-frag_tibble <- read_tsv(params$fragmentFile, col_names = c("chr", "start", "end", "barcode", "count"))
-totalFrag <- frag_tibble %>% dplyr::pull(count) %>% sum()
-mito_counts <- frag_tibble %>% dplyr::filter(str_detect(chr, "chrM")) %>% dplyr::pull(count) %>% sum()
-nfr_counts <- frag_tibble %>% dplyr::filter(end-start<=147) %>% dplyr::pull(count) %>% sum()
-monoNucleosome_counts <- frag_tibble %>% dplyr::filter(end-start>147, end-start<=294) %>% dplyr::pull(count) %>% sum()
+total_mapped_reads <- stats %>% filter(Term == "total_mapped_reads") %>% pull(value) %>% as.numeric()
+total_mapping_rate <- total_mapped_reads/me_containing_reads
+q30_mapped_reads <- stats %>% filter(Term == "q30_mapped_reads") %>% pull(value) %>% as.numeric()
+q30_mapping_rate <- q30_mapped_reads/me_containing_reads
+total_frags <- stats %>% filter(Term == "total_frags") %>% pull(value) %>% as.numeric()
+mito_frags <- stats %>% filter(Term == "mito_frags") %>% pull(value) %>% as.numeric()
+nfr_frags <- stats %>% filter(Term == "nfr_frags") %>% pull(value) %>% as.numeric()
+mono_frags <- stats %>% filter(Term == "mono_frags") %>% pull(value) %>% as.numeric()
+
 tribble(
   ~"", ~"",
-  "Total read pairs", scales::label_comma()(as.numeric(mappingReport$totalFragments)),
-  "Uniquely mapped read pairs", scales::label_comma()(as.numeric(mappingReport$uniqueReadPair)),
-  "Unique mapping rate", mappingReport$uniqueMappingRate,
-  "Total mapping rate", mappingReport$totalMappingRate,
-  "Total fragments (after dedup)", scales::label_comma()(totalFrag),
-  "Mitochondrial fragments", scales::label_comma()(mito_counts),
-  "Fragments in nucleosome-free regions", scales::label_comma()(nfr_counts),
-  "Fragments in mono-nucleosome regions", scales::label_comma()(monoNucleosome_counts),
+  "Total mapped read pairs", scales::label_comma()(total_mapped_reads),
+  "Total mapping rate", label_percent(0.01)(total_mapping_rate),
+  "High confident mapping rate", label_percent(0.01)(q30_mapping_rate),
+  "Total fragments (after dedup)", scales::label_comma()(total_frags),
+  "Mitochondrial fragments", scales::label_comma()(mito_frags),
+  "Fragments in nucleosome-free regions", scales::label_comma()(nfr_frags),
+  "Fragments in mono-nucleosome regions", scales::label_comma()(mono_frags),
 ) %>% kbl() %>% kable_paper("hover", html_font = "arial, helvetica, sans-serif") %>%
   column_spec(1, bold = T)
 ```
@@ -485,72 +336,46 @@ fragLenPlot %>% ggplotly() %>% config_plotly_fig() %>% toWebGL()
 Row
 ----------
 
-### Targeting
+### Peaks
 
 ```{r}
-tss_score <- scATAC_obj@assays$peaks@positionEnrichment$TSS %>% apply(2, mean) %>% max()
+tss_score <- obj_filtered@assays$peaks@positionEnrichment$TSS %>% apply(2, mean) %>% max()
+raw_peaks_num <- read_tsv(params$macs_peaks) %>% nrow
 tribble(
   ~"", ~"",
-  "Raw macs peaks", scales::label_comma()(length(macs_peaks)),
-  "Peaks after filtration", scales::label_comma()(nrow(scATAC_obj)),
+  "Raw macs peaks", scales::label_comma()(raw_peaks_num),
+  "Peaks observed in cells", scales::label_comma()(nrow(obj_filtered)),
   "TSS enrichment score", scales::label_number(0.01)(tss_score)
 ) %>% kbl() %>% kable_paper("hover", html_font = "arial, helvetica, sans-serif") %>%
   column_spec(1, bold = T)
 ```
 
+### Peaks Targeting
+
+```{r}
+## Some points have FRiP larger than 1, needs to be checked
+ggplot(d, aes(x=fragments, y=FRiP, color=group))+geom_point(alpha=0.8)+scale_x_log10() + 
+    theme_bw() + scale_color_manual(values=c("grey", "steelblue")) + ylim(0,1) +
+    theme(legend.title=element_blank(), panel.grid=element_blank())
+##ggplotly(p) %>% toWebGL()
+```
+
 Row
 ----------
 
-### TSS Enrichment
+### TSS Enrichment Signal
 
 ```{r}
 tssPlot %>% ggplotly() %>% config_plotly_fig() %>% toWebGL()
 ```
 
-### Peaks Targeting
+### TSS Enrichment Distribution
 
 ```{r}
-chrom_assay_raw <- CreateChromatinAssay(
-  counts = counts,
-  sep = c(":", "-"),
-  ##genome = params$refGenome,
-  fragments = params$fragmentFile,
-  min.cells = 0,
-  min.features = 0
-)
-
-scATAC_raw <- CreateSeuratObject(
-  counts = chrom_assay_raw,
-  assay = "peaks"
-)
-
-total_fragments_raw <- CountFragments(params$fragmentFile) %>%
-    dplyr::filter(CB %in% colnames(scATAC_raw)) %>% dplyr::select(CB, frequency_count)
-
-scATAC_raw@meta.data <- scATAC_raw@meta.data %>%
-    rownames_to_column("CB") %>%
-    left_join(total_fragments_raw, by="CB") %>%
-    dplyr::rename("fragments" = frequency_count) %>%
-    column_to_rownames("CB")
-
-scATAC_raw <- FRiP(
-  object = scATAC_raw,
-  assay = 'peaks',
-  total.fragments = 'fragments'
-)
-
-k <- scATAC_raw@meta.data %>% dplyr::select(FRiP,fragments) %>%
-    tibble::rownames_to_column("CB") %>%
-    mutate(
-        group = case_when(
-            CB %in% cells ~ "cell",
-            TRUE ~ "background"
-    ))
 ## Some points have FRiP larger than 1, needs to be checked
-ggplot(k, aes(x=fragments, y=FRiP, color=group))+geom_point(alpha=0.8)+scale_x_log10() + 
+ggplot(d, aes(x=fragments, y=TSS.enrichment, color=group))+geom_point(alpha=0.8)+scale_x_log10() + 
     theme_bw() + scale_color_manual(values=c("grey", "steelblue")) + ylim(0,1) +
     theme(legend.title=element_blank(), panel.grid=element_blank())
-##ggplotly(p) %>% toWebGL()
 ```
 
 ```{js}
@@ -560,37 +385,11 @@ $( document ).ready(function() {
 });
 ```
 
-
 ```{r include=FALSE}
-## gather metrics and write metrics json file
-## metrics includes:
-## cellNumber
-## mean fragments per cell
-## median fragments per cell
-## mean FRiP per cell
-## median FRiP per cell
-## raw Reads
-## valid barcode ratio
-## Q30 in barcode
-## Q30 in read1
-## Q30 in read2
-## NRF
-## PBC1
-## PBC2
-## Duplication ratio
-## total fragments
-## total reads of fragments
+stats <- stats %>% 
+    add_row(Term = "total_mapping_rate", value = as.character(total_mapping_rate), .after = 10) %>%
+    add_row(Term = "q30_mapping_rate", value = as.character(q30_mapping_rate), .after = 13) %>%
+    add_row(Term = "valid_barcode_ratio", value = as.character(valid_barcode_ratio), .after = 8)
 
-##metrics_tbl <- tribble(
-##  ~"term", ~"value",
-##  "sample", params$sampleName,
-##  "Number of Raw Reads", readReport$rawReadPairs,
-##  "Reads with Valid Barcodes", validBarcode_rate,
-##  "Q30 Bases in Barcodes", readReport$Q30_bcRead,
-##  "Q30 Bases in Read 1", readReport$Q30_read1,
-##  "Q30 Bases in Read 2", readReport$Q30_read2,
-##  "Total Mapping Rate", ,
-##  "Uniquely Mapping Rate", ,
-##  
-##)
+write_tsv(stats, file = paste0(params$sampleName, "_combined_stats.tsv"))
 ```

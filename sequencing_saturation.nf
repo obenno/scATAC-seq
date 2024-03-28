@@ -3,8 +3,7 @@ process CHECK_SATURATION {
     label 'process_high'
 
     input:
-    tuple val(sampleID), path(inputBam)
-    tuple val(sampleID), path(inputBamBai)
+    tuple val(sampleID), path(inputBam), path(inputBamBai)
 
     output:
     tuple val(sampleID), path("${sampleID}.saturation_out.json"), emit: outJSON
