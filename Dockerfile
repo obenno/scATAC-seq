@@ -23,8 +23,8 @@ WORKDIR /app
 ## Update the base env with app env file
 ## All the packages will be installed to base env and no need to activate
 ## specific package in entrypoint.sh
-COPY scRNAseq_env.yml .
-RUN mamba env update -n base -f scRNAseq_env.yml && rm scRNAseq_env.yml
+COPY scATAC_env.yml .
+RUN mamba env update -n base -f scATAC_env.yml && rm scATAC_env.yml
 
 ## copy entrypoint.sh
 ##COPY entrypoint.sh .
