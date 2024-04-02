@@ -18,18 +18,18 @@ option_list <- list(
                 help = "minimum cells"),
     make_option(c("--minFeature"), type = "integer", default = 200,
                 help = "minimum featuers"),
-    make_option(c("--TSS_enrichment_cutoff"), type = "integer", default = 3,
-                help = "TSS enrichment cutoff"),
-    make_option(c("--nucleosome_signal_cutoff"),type = "integer", default = 4,
-                help = "Nucleosome signal cutoff"),
+    ##make_option(c("--TSS_enrichment_cutoff"), type = "integer", default = 3,
+    ##            help = "TSS enrichment cutoff"),
+    ##make_option(c("--nucleosome_signal_cutoff"),type = "integer", default = 4,
+    ##            help = "Nucleosome signal cutoff"),
     make_option(c("--nCount_min"), type = "integer", default = 0,
                 help = "Allowed min fragment counts in cells when selecting cells"),
-    make_option(c("--nCount_max"), type = "integer", default = 30000,
-                help = "Allowed max fragment counts in cells when selecting cells"),
-    make_option(c("--FRiP_cutoff"), type = "double", default = 0.15,
-                help = "Naive FRiP cutoff used when selecting cells"),
-    make_option(c("--blacklist_fraction_cutoff"), type = "double", default = 0.05,
-                help = "Naive blacklist cutoff used when selecting cells"),
+    ##make_option(c("--nCount_max"), type = "integer", default = 30000,
+    ##            help = "Allowed max fragment counts in cells when selecting cells"),
+    ##make_option(c("--FRiP_cutoff"), type = "double", default = 0.15,
+    ##            help = "Naive FRiP cutoff used when selecting cells"),
+    ##make_option(c("--blacklist_fraction_cutoff"), type = "double", default = 0.05,
+    ##            help = "Naive blacklist cutoff used when selecting cells"),
     make_option(c("--raw_cells_out"), type = "character", default = "cells.tsv",
                 help = "Output tsv file containing barcodes of the cells detected"),
     make_option(c("--raw_meta_metrics"), type = "character", default = "raw_meta.tsv",
@@ -217,23 +217,26 @@ obj$blacklist_fraction <- FractionCountsInRegion(
   regions = blackListObj
 )
 
+## Non naive filters were applied, only select cells by ostu on fragments overlapping peaks
+## This will allow users to further filter cells by their own
 
 ## Apply naive cutoffs
-message("cell selection cutoffs:")
-message("nCount_peaks > ", fragmentCutoff)
-message("nCount_peaks < ", opt$nCount_max)
-message("FRiP > ", opt$FRiP_cutoff)
-message("blacklist_fraction < ", opt$blacklist_fraction_cutoff)
-message("nucleosome_signal < ", opt$nucleosome_signal_cutoff)
-message("TSS.enrichment > ", opt$TSS_enrichment_cutoff)
+## Do not constrain TSS and NS
+##message("cell selection cutoffs:")
+##message("nCount_peaks > ", fragmentCutoff)
+##message("nCount_peaks < ", opt$nCount_max)
+##message("FRiP > ", opt$FRiP_cutoff)
+##message("blacklist_fraction < ", opt$blacklist_fraction_cutoff)
+##message("nucleosome_signal < ", opt$nucleosome_signal_cutoff)
+##message("TSS.enrichment > ", opt$TSS_enrichment_cutoff)
 scATAC_obj <- subset(
   x = obj,
-  subset = nCount_peaks > fragmentCutoff &
-    nCount_peaks < opt$nCount_max &
-    FRiP > opt$FRiP_cutoff &
-    blacklist_fraction < opt$blacklist_fraction_cutoff &
-    nucleosome_signal < opt$nucleosome_signal_cutoff &
-    TSS.enrichment > opt$TSS_enrichment_cutoff
+  subset = nCount_peaks > fragmentCutoff ##&
+##    nCount_peaks < opt$nCount_max &
+##    FRiP > opt$FRiP_cutoff &
+##    blacklist_fraction < opt$blacklist_fraction_cutoff &
+##    ##nucleosome_signal < opt$nucleosome_signal_cutoff &
+##    ##TSS.enrichment > opt$TSS_enrichment_cutoff
 )
 
 filtered_cells <- Cells(scATAC_obj)

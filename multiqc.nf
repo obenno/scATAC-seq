@@ -35,19 +35,5 @@ process MULTIQC {
     ln -s ${read2_after} ${prefix}_trimmed_R2.fq.gz
     fastqc -t $fastqcThreads --nogroup ${prefix}_raw_R1.fq.gz ${prefix}_raw_R2.fq.gz ${prefix}_trimmed_R1.fq.gz ${prefix}_trimmed_R2.fq.gz
     multiqc --title ${prefix} .
-    ##rawReadPairs=""
-    ##validBarcodeReadPairs=""
-    ##validBarcode_ratio=""
-    ##
-    ##Q30_read1=""
-    ##Q30_read2=""
-    ##
-    ##jq -n \
-    ##   --arg sampleName "${sampleID}" \\
-    ##   --arg validBarcode_ratio "\$validBarcode_ratio" \\
-    ##   --arg rawReadPairs "\$rawReadPairs" \\
-    ##   --arg Q30_read1 "\$Q30_read1" \\
-    ##   --arg Q30_read2 "\$Q30_read2" \\
-    ##   '{sampleName: \$sampleName, rawReadPairs: \$rawReadPairs, validBarcode_ratio: \$validBarcode_ratio, Q30_read1: \$Q30_read1, Q30_read2: \$Q30_read2}' > ${sampleID}.readReport.json
     """
 }

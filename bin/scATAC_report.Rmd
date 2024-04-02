@@ -372,9 +372,8 @@ tssPlot %>% ggplotly() %>% config_plotly_fig() %>% toWebGL()
 ### TSS Enrichment Distribution
 
 ```{r}
-## Some points have FRiP larger than 1, needs to be checked
 ggplot(d, aes(x=fragments, y=TSS.enrichment, color=group))+geom_point(alpha=0.8)+scale_x_log10() + 
-    theme_bw() + scale_color_manual(values=c("grey", "steelblue")) + ylim(0,1) +
+    theme_bw() + scale_color_manual(values=c("grey", "steelblue")) +
     theme(legend.title=element_blank(), panel.grid=element_blank())
 ```
 
