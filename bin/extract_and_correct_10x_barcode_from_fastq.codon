@@ -1,0 +1,275 @@
+#! /usr/bin/env -S codon run -plugin seq
+
+## This script has referenced the orginal BioRad barcode extraction script written by Gert Hulselmans
+## https://github.com/aertslab/single_cell_toolkit/blob/master/extract_and_correct_biorad_barcode_from_fastq.seq
+
+from bio import *
+import sys
+
+from bio.kmer import Kmer
+import openmp as omp
+import gzip
+import random
+import string
+
+from threading import Lock
+lock = Lock()
+
+# Written in codon/seq.
+#
+# Purpose: Extract barcodes from FASTQ file in 10x design:
+#   https://github.com/caleblareau/bap/wiki/Working-with-BioRad-data
+#
+
+# Qual dict
+qual_dict = Dict[str, int]()
+qual_string: str = "!\"#$%&\'()*+,-./0123456789:;<=>?@ABCDEFGHI"
+## populate qual_dict
+qual_score :int = 0
+for i in qual_string:
+    qual_score +=1
+    qual_dict[i] = qual_score
+
+bc_length: int = 16
+# Specify barcode length of barcodes in the whitelist.
+barcode_kmer_type = Kmer[16]
+
+## read bc whitelist
+bc_whitelist_kmers = set[Kmer]()
+
+nbr_reads = 0
+nbr_reads_with_bc_correct_or_correctable = 0
+
+## init values to store q30 statistics
+barcode_q30_base = 0
+barcode_total_base = 0
+r1_q30_base = 0
+r1_total_base = 0
+r2_q30_base = 0
+r2_total_base = 0
+
+def neighbors(kmer):
+    """
+    Create kmers with hamming distance of 1.
+    """
+
+    for i in range(len(kmer)):
+        for b in (k"A", k"C", k"G", k"T"):
+            if kmer[i] != b:
+                yield kmer |> base(i, b)
+
+
+@tuple
+class CorrectedBc:
+    mismatch_dist: int
+    corrected_bc: str
+
+
+def correct_bc_with_whitelist(bc_whitelist: set[barcode_kmer_type], bc: barcode_kmer_type) -> CorrectedBc:
+    """
+    Check if provided barcode matches the whitelist (0 or 1 mismatch allowed).
+    """
+
+    if bc in bc_whitelist:
+        # Exact match.
+        return CorrectedBc(0, str(bc))
+    for neighbor in neighbors(bc):
+        if neighbor in bc_whitelist:
+            # Hamming neighbor in whitelist (distance = 1).
+            return CorrectedBc(1, str(neighbor))
+
+    # No match.
+    return CorrectedBc(-1, str(bc))
+
+
+@tuple
+class Barcodes:
+    bc_hamming_dist: int
+    bc: seq
+
+
+def process_fastq_record(record, out_r1_fh, out_r2_fh):
+    with lock:
+        global nbr_reads
+        global nbr_reads_with_bc_correct_or_correctable
+        global barcode_total_base
+        global barcode_q30_base
+        global r1_total_base
+        global r1_q30_base
+        global r2_total_base
+        global r2_q30_base
+        nbr_reads += 1
+
+        seq_without_Ns = seq(str(record.seq).replace("N", "A"))
+
+        ## split long sequence into r1, r2 and bc by searching linkerSeq
+        bc_seq = seq_without_Ns[0:bc_length]
+        bc_qual = record.qual[0:bc_length]
+        idx_r1: int = bc_length + 25
+        r1_r2_seq = seq_without_Ns[idx_r1:]
+        r1_r2_qual = record.qual[idx_r1:]
+        idx: int = 0
+        for s in r1_r2_seq.split(k=25, step=1):
+            idx += 1
+            if s == seq("X"*25):
+                break
+        r1_seq_end = idx -1
+        r1_seq = r1_r2_seq[0:r1_seq_end]
+        r1_qual = r1_r2_qual[0:r1_seq_end]
+        r2_seq_start = idx+25-1
+        r2_seq = r1_r2_seq[r2_seq_start:]
+        r2_qual = r1_r2_qual[r2_seq_start:]
+
+        corrected_bc = CorrectedBc(-1, "")
+
+        # Get raw barcodes.
+        bc_kmer = barcode_kmer_type(bc_seq)
+        corrected_bc = correct_bc_with_whitelist(bc_whitelist_kmers, bc_kmer)
+
+        if corrected_bc.mismatch_dist == -1:
+            # At least one of the barcode parts could not be corrected.
+            # Add Biorad tag "br:Z:" to read name comment with number of mismatches for each barcode part.
+            out_r1_fh.write(
+                f"@{record.name}\t" +
+                f"CR:Z:{bc_seq}\t" +
+                f"CY:Z:{bc_qual}\t" +
+                f"CB:Z:-\t" +
+                f"br:Z:{corrected_bc.mismatch_dist}\n" +
+                f"{r1_seq}\n+\n" +
+                f"{r1_qual}\n"
+            )
+            out_r2_fh.write(
+                f"@{record.name}\t" +
+                f"CR:Z:{bc_seq}\t" +
+                f"CY:Z:{bc_qual}\t" +
+                f"CB:Z:-\t" +
+                f"br:Z:{corrected_bc.mismatch_dist}\n" +
+                f"{r2_seq}\n+\n" +
+                f"{r2_qual}\n"
+            )
+        else:
+            nbr_reads_with_bc_correct_or_correctable += 1
+
+            ## only calculate quality from reads with valid barcode
+            barcode_total_base += len(bc_qual)
+            for q in str(bc_qual):
+                if qual_dict[q]>=30:
+                    barcode_q30_base += 1
+
+            r1_total_base += len(r1_qual)
+            for q in str(r1_qual):
+                if qual_dict[q]>=30:
+                    r1_q30_base += 1
+
+            r2_total_base += len(r2_qual)
+            for q in str(r2_qual):
+                if qual_dict[q]>=30:
+                    r2_q30_base += 1
+
+            # Write the corrected barcode as CB tag in the FASTQ comment.
+            # Add Biorad tag "br:Z:" to read name comment with number of mismatches for each barcode part.
+            out_r1_fh.write(
+                f"@{record.name}\t" +
+                f"CR:Z:{bc_seq}\t" +
+                f"CY:Z:{bc_qual}\t" +
+                f"CB:Z:{corrected_bc.corrected_bc}\t" +
+                f"br:Z:{corrected_bc.mismatch_dist}\n" +
+                f"{r1_seq}\n+\n" +
+                f"{r1_qual}\n"
+            )
+            out_r2_fh.write(
+                f"@{record.name}\t" +
+                f"CR:Z:{bc_seq}\t" +
+                f"CY:Z:{bc_qual}\t" +
+                f"CB:Z:{corrected_bc.corrected_bc}\t" +
+                f"br:Z:{corrected_bc.mismatch_dist}\n" +
+                f"{r2_seq}\n+\n" +
+                f"{r2_qual}\n"
+            )
+
+def randomLetter(k:int = 6) -> str:
+    return ''.join(random.choices(string.ascii_letters, k=k))
+
+def extract_and_correct_thunderbio_barcode_from_fastq(
+    raw_bc_fastq: str,
+    raw_r1_fastq: str,
+    raw_r2_fastq: str,
+    corrected_bc_r1_filename: str,
+    corrected_bc_r2_filename: str,
+    corrected_bc_stats_tsv_filename: str,
+):
+    """
+    Read FASTQ file with barcodes and append " CB:Z:corrected_barcode" to the FASTQ
+    record comment if the barcode matches the whitelist (exact match or 1 mismatch).
+    """
+
+    ##if fastq_with_corrected_bc_filename == "-":
+    ##    fastq_with_corrected_bc_filename = "/dev/stdout"
+
+    ## first concatenate r1,r2 sequences into one, separate with 25 N
+    tempfilePath = "./combined_r1_r2_bc" + randomLetter() + ".fq.gz"
+    linkerSeq = "X" * 25
+    linkerQual = "I" * 25
+    with gzip.open(tempfilePath, "wb") as temp_fh:
+        for r1, r2, bc in zip(FASTQ(raw_r1_fastq, gzip = True, validate = False, copy = True),
+                          FASTQ(raw_r2_fastq, gzip = True, validate = False, copy = True),
+                          FASTQ(raw_bc_fastq, gzip = True, validate = False, copy = True)):
+            temp_fh.write(
+                f"@{r1.name}\n" +
+                f"{bc.seq}" + linkerSeq + f"{r1.seq}" + linkerSeq + f"{r2.seq}\n" +
+                f"+\n" +
+                f"{bc.qual}" + linkerSeq + f"{r1.qual}" + linkerQual + f"{r2.qual}\n"
+            )
+
+    ##with gzip.open(corrected_bc_r1_filename, "wt") as corrected_bc_r1_fh, gzip.open(corrected_bc_r2_filename, "wt") as corrected_bc_r2_fh:
+    ## Note: gzip.open doesn't support parallelism here, force to use plain text output
+    with open(corrected_bc_r1_filename, "wt") as corrected_bc_r1_fh, open(corrected_bc_r2_filename, "wt") as corrected_bc_r2_fh:
+        FASTQ(tempfilePath, gzip = True, validate = False, copy = True) |> blocks(size=2000) ||> iter |> process_fastq_record(corrected_bc_r1_fh, corrected_bc_r2_fh)
+
+    ## remove tempFastq
+    ##os.remove(tempfilePath)
+
+    with open(corrected_bc_stats_tsv_filename, "wt") as corrected_bc_stats_tsv_fh:
+        barcode_q30_ratio = barcode_q30_base/barcode_total_base
+        r1_q30_ratio = r1_q30_base/r1_total_base
+        r2_q30_ratio = r2_q30_base/r2_total_base
+        corrected_bc_stats_tsv_fh.write(
+            f"nbr_reads:\t{nbr_reads}\n" +
+            f"nbr_reads_with_bc_correct_or_correctable\t{nbr_reads_with_bc_correct_or_correctable}\n" +
+            f"valid_barcode_reads_barcode_q30_ratio\t{barcode_q30_ratio}\n" +
+            f"valid_barcode_reads_r1_q30_ratio\t{r1_q30_ratio}\n" +
+            f"valid_barcode_reads_r2_q30_ratio\t{r2_q30_ratio}\n"
+        )
+
+if len(sys.argv) <= 4:
+    sys.stderr.write(f"Usage: {sys.argv[0]} whitelist raw_bc_fastq raw_r1_fastq raw_r2_fastq out_r1_fastq out_r2_fastq corrected_bc_stats_file threads\n")
+    sys.exit(1)
+else:
+    bc_whitelist_file = sys.argv[1]
+    raw_bc_fastq_filename = sys.argv[2]
+    ## cutadapt linker adapter style
+    raw_r1_fastq_filename = sys.argv[3]
+    raw_r2_fastq_filename = sys.argv[4]
+    corrected_bc_r1_filename = sys.argv[5]
+    corrected_bc_r2_filename = sys.argv[6]
+    corrected_bc_stats_tsv_filename = sys.argv[7]
+    threads = int(sys.argv[8])
+    ## reads whitelist
+    with open(bc_whitelist_file) as f:
+        bc_whitelist = f.readlines()
+
+    for line in bc_whitelist:
+        bc_whitelist_kmers.add(barcode_kmer_type(line.strip()))
+
+    ## Set openmp parameters
+    omp.set_num_threads(threads)
+    # Read FASTQ with barcodes and write a FASTQ with corrected barcodes for barcodes that
+    # match the whitelist of barcodes closely enough, else write the original barcodes.
+    extract_and_correct_thunderbio_barcode_from_fastq(
+        raw_bc_fastq_filename,
+        raw_r1_fastq_filename,
+        raw_r2_fastq_filename,
+        corrected_bc_r1_filename,
+        corrected_bc_r2_filename,
+        corrected_bc_stats_tsv_filename
+    )
