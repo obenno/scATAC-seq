@@ -60,8 +60,13 @@ workflow {
     ch_genomeGTF = file(params.genomeGTF)
     ch_whitelist = Channel.fromPath(params.whitelist.split(" ").toList())
 
+    CAT_FASTQ( ch_fastq )
+    CAT_FASTQ.out.read1
+    .join(CAT_FASTQ.out.read2, by:[0])
+    .set{ ch_merged_fastq }
+
     CHECK_BARCODE(
-        ch_fastq,
+        ch_merged_fastq,
         ch_whitelist.toList()
     )
 
@@ -76,13 +81,13 @@ workflow {
         ch_bwaIndex
     )
     
-    ch_mapping_bam = BWA_MAPPING.out.bam.join(BWA_MAPPING.out.bai)
+    ch_mapping_bam = BWA_MAPPING.out.bam.join(BWA_MAPPING.out.bai, by:[0])
     DEDUP(
         ch_mapping_bam
     )
     
-    CHECK_BARCODE.out.merged_r1
-    .join(CHECK_BARCODE.out.merged_r2, by:[0])
+    CAT_FASTQ.out.read1
+    .join(CAT_FASTQ.out.read2, by:[0])
     .join(TRIM_FASTQ.out.read1, by:[0])
     .join(TRIM_FASTQ.out.read2, by:[0])
     .join(TRIM_FASTQ.out.report_JSON, by:[0])

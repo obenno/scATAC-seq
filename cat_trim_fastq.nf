@@ -1,4 +1,4 @@
-process CHECK_BARCODE {
+process CAT_FASTQ {
     tag "${sampleID}"
     label 'process_high'
 
@@ -7,19 +7,13 @@ process CHECK_BARCODE {
     path(whitelist)
 
     output:
-    tuple val(sampleID), path("${sampleID}_1.cutadapt_input.fq.gz"), emit: read1
-    tuple val(sampleID), path("${sampleID}_2.cutadapt_input.fq.gz"), emit: read2
-    tuple val(sampleID), path("${sampleID}_1.merged.fq.gz"),         emit: merged_r1
-    tuple val(sampleID), path("${sampleID}_2.merged.fq.gz"),         emit: merged_r2
-    tuple val(sampleID), path("${sampleID}_barcode_stats.tsv"),      emit: stats
+    tuple val(sampleID), path("${sampleID}_1.merged.fq.gz"),         emit: read1
+    tuple val(sampleID), path("${sampleID}_2.merged.fq.gz"),         emit: read2
 
     script:
     def prefix   = "${sampleID}"
     def read1 = read1_list.collect{ it.toString() }
     def read2 = read2_list.collect{ it.toString() }
-    def whitelist_collapsed = whitelist.collect{ it.toString() }.join(',')
-    def pigzThreads = Math.min(6, task.cpus)
-
     scriptString = []
     
     if(read1.size == 1 && read2.size == 1){
@@ -37,13 +31,36 @@ process CHECK_BARCODE {
         """.stripIndent()
         )
     }
+    scriptString.reverse().join()
+    
+}
 
-    scriptString.push(
+
+process CHECK_BARCODE {
+    tag "${sampleID}"
+    label 'process_high'
+
+    input:
+    tuple val(sampleID), path(read1), path(read2)
+    path(whitelist)
+
+    output:
+    tuple val(sampleID), path("${sampleID}_1.cutadapt_input.fq.gz"), emit: read1
+    tuple val(sampleID), path("${sampleID}_2.cutadapt_input.fq.gz"), emit: read2
+    tuple val(sampleID), path("${sampleID}_barcode_stats.tsv"),      emit: stats
+
+    script:
+    def prefix   = "${sampleID}"
+    def read1 = read1_list.collect{ it.toString() }
+    def read2 = read2_list.collect{ it.toString() }
+    def whitelist_collapsed = whitelist.collect{ it.toString() }.join(',')
+    def pigzThreads = Math.min(6, task.cpus)
+
     """
     extract_and_correct_thunderbio_barcode_from_fastq \
     $whitelist_collapsed \
-    ${prefix}_1.merged.fq.gz \
-    ${prefix}_2.merged.fq.gz \
+    ${read1} \
+    ${read2} \
     ${prefix}_1.barcode.fq \
     ${prefix}_2.barcode.fq \
     ${prefix}_barcode_stats.tsv \
@@ -52,17 +69,13 @@ process CHECK_BARCODE {
     ## remove temp fastq
     rm combined_r1_r2_*.fq.gz
     
-    ## compress fastq
-    pigz -p $pigzThreads ${prefix}_1.barcode.fq ${prefix}_2.barcode.fq
-    
-    zcat ${prefix}_1.barcode.fq.gz | awk 'NR%4==1{if(\$4!="CB:Z:-"){print;getline;print;getline;print;getline;print}}' | pigz -p $pigzThreads > ${prefix}_1.cutadapt_input.fq.gz
-    zcat ${prefix}_2.barcode.fq.gz | awk 'NR%4==1{if(\$4!="CB:Z:-"){print;getline;print;getline;print;getline;print}}' | pigz -p $pigzThreads > ${prefix}_2.cutadapt_input.fq.gz
+    awk 'NR%4==1{if(\$4!="CB:Z:-"){print;getline;print;getline;print;getline;print}}' ${prefix}_1.barcode.fq |
+        pigz -p $pigzThreads > ${prefix}_1.cutadapt_input.fq.gz
+    awk 'NR%4==1{if(\$4!="CB:Z:-"){print;getline;print;getline;print;getline;print}}' ${prefix}_2.barcode.fq |
+        pigz -p $pigzThreads > ${prefix}_2.cutadapt_input.fq.gz
 
-    rm ${prefix}_1.barcode.fq.gz ${prefix}_2.barcode.fq.gz
-    """.stripIndent()
-    )
-
-    scriptString.reverse().join()
+    rm ${prefix}_1.barcode.fq ${prefix}_2.barcode.fq
+    """
 }
 
 process TRIM_FASTQ {
