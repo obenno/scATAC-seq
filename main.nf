@@ -14,7 +14,7 @@ if (!params.bwaIndex) { exit 1, 'BWA Index not specified!' }
 if (!params.whitelist) { exit 1, 'White not specified!' }
 
 // include all processes
-include { CHECK_BARCODE; TRIM_FASTQ } from './cat_trim_fastq'
+include { CAT_FASTQ; CHECK_BARCODE; TRIM_FASTQ } from './cat_trim_fastq'
 include { BWA_MAPPING } from './bwa_mapping'
 include { MULTIQC } from './multiqc'
 include { STATS } from './stats'
