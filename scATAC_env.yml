@@ -41,7 +41,6 @@ dependencies:
   - jq
   - r-rhpcblasctl
   - parallel>=20230922
-  - picard
   - sinto
   - multiqc
   - numpy

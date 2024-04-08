@@ -13,15 +13,6 @@ process DEDUP {
     """
     ## Mark duplicates
     export TMPDIR="./"
-    ##mkdir picard_tmp
-    ##picard MarkDuplicates \\
-    ##    --TMP_DIR ./picard_tmp \\
-    ##    --INPUT ${inputBam} \\
-    ##    --OUTPUT ${sampleID}.mark_dup.bam \\
-    ##    --METRICS_FILE ${sampleID}.mark_dup.metrics \\
-    ##    --VALIDATION_STRINGENCY LENIENT \\
-    ##    --ASSUME_SORT_ORDER coordinate
-
     ## Use samtools markdup instead of picard
     ## --no-multi-dup speed up the process
     samtools markdup -@ $task.cpus \\
@@ -38,6 +29,5 @@ process DEDUP {
  
     ## remove sorted bam to save space
     rm ${sampleID}.mark_dup.bam
-    ##ratio=\$(awk '\$0~/^## METRICS CLASS/{getline; getline; pos=NF-1; print \$pos}' ${sampleID}.mark_dup.metrics)
     """
 }
