@@ -5,8 +5,6 @@ process STATS {
     input:
     tuple val(sampleID),
           path(barcode_stats),
-          path(barcode_read1),
-          path(barcode_read2),
           path(cutadapt_json),
           path(bam_stats),
           path(dedupMetrics),
@@ -24,7 +22,7 @@ process STATS {
     shell:
     '''
     total_input_readPairs=$(awk '$1=="nbr_reads:"{print $2}' !{barcode_stats})
-    valid_barcode_readPairs=$(awk '$1=="nbr_reads_with_bc1_bc2_bc3_correct_or_correctable"{print $2}' !{barcode_stats})
+    valid_barcode_readPairs=$(awk '$1~/nbr_reads_with_bc.*_correct_or_correctable/{print $2}' !{barcode_stats})
     with_me_q30_readPairs=$(jq -r ".read_counts.output" !{cutadapt_json})
     total_mapped_readPairs=$(grep ^SN !{bam_stats} | cut -f 2- | awk -F"\t" '$1=="reads mapped and paired:"{print $2/2}')
     duplicated_readPairs=$(awk '$0~/^DUPLICATE PAIR:/{print $NF}' !{dedupMetrics})

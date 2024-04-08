@@ -4,7 +4,6 @@ process CAT_FASTQ {
 
     input:
     tuple val(sampleID), path(read1_list), path(read2_list)
-    path(whitelist)
 
     output:
     tuple val(sampleID), path("${sampleID}_1.merged.fq.gz"),         emit: read1
@@ -51,19 +50,17 @@ process CHECK_BARCODE {
 
     script:
     def prefix   = "${sampleID}"
-    def read1 = read1_list.collect{ it.toString() }
-    def read2 = read2_list.collect{ it.toString() }
     def whitelist_collapsed = whitelist.collect{ it.toString() }.join(',')
     def pigzThreads = Math.min(6, task.cpus)
 
     """
-    extract_and_correct_thunderbio_barcode_from_fastq \
-    $whitelist_collapsed \
-    ${read1} \
-    ${read2} \
-    ${prefix}_1.barcode.fq \
-    ${prefix}_2.barcode.fq \
-    ${prefix}_barcode_stats.tsv \
+    extract_and_correct_thunderbio_barcode_from_fastq \\
+    $whitelist_collapsed \\
+    ${read1} \\
+    ${read2} \\
+    ${prefix}_1.barcode.fq \\
+    ${prefix}_2.barcode.fq \\
+    ${prefix}_barcode_stats.tsv \\
     $task.cpus
 
     ## remove temp fastq
@@ -84,7 +81,6 @@ process CAT_FASTQ_10X {
 
     input:
     tuple val(sampleID), path(read1_list), path(read2_list), path(read3_list)
-    path(whitelist)
 
     output:
     tuple val(sampleID), path("${sampleID}_1.merged.fq.gz"),         emit: read1
@@ -134,20 +130,17 @@ process CHECK_BARCODE_10X {
 
     script:
     def prefix   = "${sampleID}"
-    def read1 = read1_list.collect{ it.toString() }
-    def read2 = read2_list.collect{ it.toString() }
-    def whitelist_collapsed = whitelist.collect{ it.toString() }
     def pigzThreads = Math.min(6, task.cpus)
 
     """
-    extract_and_correct_10x_barcode_from_fastq \
-    $whitelist_collapsed \
-    ${read2}
-    ${read1} \
-    ${read3} \
-    ${prefix}_1.barcode.fq \
-    ${prefix}_2.barcode.fq \
-    ${prefix}_barcode_stats.tsv \
+    extract_and_correct_10x_barcode_from_fastq \\
+    ${whitelist} \\
+    ${read2} \\
+    ${read1} \\
+    ${read3} \\
+    ${prefix}_1.barcode.fq \\
+    ${prefix}_2.barcode.fq \\
+    ${prefix}_barcode_stats.tsv \\
     $task.cpus
 
     ## remove temp fastq
