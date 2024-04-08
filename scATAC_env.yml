@@ -45,3 +45,4 @@ dependencies:
   - sinto
   - multiqc
   - numpy
+  - macs2
