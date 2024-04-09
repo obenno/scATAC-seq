@@ -8,6 +8,7 @@ output:
     theme:
       version: 4
       bootswatch: sandstone
+      base_font: 'nudista-web, "Ropa Sans", Arial, sans-serif'
 params:
   nCPUs: 6
   nMem: 10000000000.0
@@ -71,6 +72,10 @@ document.querySelector(".navbar").classList.remove("navbar-inverse");
 document.querySelector(".navbar").classList.add("navbar-default");
 document.querySelector(".navbar").classList.add("pt-1");
 document.querySelector(".navbar").classList.add("pb-1");
+```
+
+```{r include=FALSE}
+html_font <- 'nudista-web, "Ropa Sans", Arial, sans-serif'
 ```
 
 ```{r preprocess, include=FALSE}
@@ -165,7 +170,7 @@ tribble(
   "Mean of FRiP in cells", scales::label_percent(0.01)(cellFRiP_mean),
   "Median of FRiP in cells", scales::label_percent(0.01)(cellFRiP_median)
   ##"Fraction of transposition events in peaks in cells", "100",
-) %>% kbl() %>% kable_paper("hover", html_font = "arial, helvetica, sans-serif") %>%
+) %>% kbl() %>% kable_paper("hover", html_font = html_font) %>%
   column_spec(1, bold = T)
 ```
 
@@ -189,7 +194,7 @@ tribble(
   "Q30 bases in barcode", label_percent(0.01)(barcode_q30_ratio),
   "Q30 bases in read 1", label_percent(0.01)(r1_q30_ratio),
   "Q30 bases in read 2", label_percent(0.01)(r2_q30_ratio)
-) %>% kbl() %>% kable_paper("hover", html_font = "arial, helvetica, sans-serif") %>%
+) %>% kbl() %>% kable_paper("hover", html_font = html_font) %>%
   column_spec(1, bold = T)
 ```
 
@@ -276,7 +281,7 @@ tribble(
   "Duplication", label_percent(0.01)(duplicationRatio)
 ) %>%
 kbl() %>% 
-kable_paper("hover", html_font = "arial, helvetica, sans-serif") %>%
+kable_paper("hover", html_font = html_font) %>%
 column_spec(1, bold = T)
 ```
 
@@ -323,7 +328,7 @@ tribble(
   "Mitochondrial fragments", scales::label_comma()(mito_frags),
   "Fragments in nucleosome-free regions", scales::label_comma()(nfr_frags),
   "Fragments in mono-nucleosome regions", scales::label_comma()(mono_frags),
-) %>% kbl() %>% kable_paper("hover", html_font = "arial, helvetica, sans-serif") %>%
+) %>% kbl() %>% kable_paper("hover", html_font = html_font) %>%
   column_spec(1, bold = T)
 ```
 
@@ -346,7 +351,7 @@ tribble(
   "Raw macs peaks", scales::label_comma()(raw_peaks_num),
   "Peaks observed in cells", scales::label_comma()(nrow(obj_filtered)),
   "TSS enrichment score", scales::label_number(0.01)(tss_score)
-) %>% kbl() %>% kable_paper("hover", html_font = "arial, helvetica, sans-serif") %>%
+) %>% kbl() %>% kable_paper("hover", html_font = html_font) %>%
   column_spec(1, bold = T)
 ```
 
