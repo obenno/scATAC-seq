@@ -7,11 +7,9 @@ nextflow.enable.dsl=2
 
 // check mandatory params
 if (!params.input) { exit 1, 'Input samplesheet not specified!' }
-if (!params.bwaIndex) { exit 1, 'STAR Index not specified!' }
-//if (!params.genomeFasta) { exit 1, 'Genome Fasta not specified!' }
 if (!params.genomeGTF) { exit 1, 'Genome GTF not specified!' }
 if (!params.bwaIndex) { exit 1, 'BWA Index not specified!' }
-if (!params.whitelist) { exit 1, 'White not specified!' }
+if (!params.whitelist) { exit 1, 'Whitelist not specified!' }
 
 // include all processes
 include { CAT_FASTQ; CHECK_BARCODE; TRIM_FASTQ } from './cat_trim_fastq'
