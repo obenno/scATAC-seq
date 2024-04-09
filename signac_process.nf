@@ -32,6 +32,8 @@ process SIGNAC {
                      --gtf $gtf \\
                      -t $task.cpus \\
                      -m $nMem \\
+                     --minCell ${params.minCell} \\
+                     --minFeature ${params.minFeature} \\
                      --nCount_min ${params.nCountMin} \\
                      --raw_cells_out ${sampleID}_raw_cells.tsv \\
                      --raw_meta_metrics ${sampleID}_raw_meta.tsv \\
