@@ -25,7 +25,7 @@ process STATS {
     valid_barcode_readPairs=$(awk '$1~/nbr_reads_with_bc.*_correct_or_correctable/{print $2}' !{barcode_stats})
     with_me_q30_readPairs=$(jq -r ".read_counts.output" !{cutadapt_json})
     total_mapped_readPairs=$(grep ^SN !{bam_stats} | cut -f 2- | awk -F"\t" '$1=="reads mapped and paired:"{print $2/2}')
-    duplicated_readPairs=$(awk '$0~/^DUPLICATE PAIR:/{print $NF}' !{dedupMetrics})
+    duplicated_readPairs=$(awk '$0~/^DUPLICATE PAIR:/{print $NF/2}' !{dedupMetrics})
     ##uniquely_mapped_readPairs=$(samtools view -@ !{task.cpus} -F 0x4 -F 0x100 -F 0x800 -e '! [XA] && ! [SA]' !{inputBam})
     q30_readPairs=$(samtools view -c -@ !{task.cpus} -f 0x1 -f 0x2 -f 0x40 -F 0x4 -F 0x8 -F 0x100 -F 0x800 -q 30 !{inputBam})
     barcode_q30_ratio=$(awk '$1=="valid_barcode_reads_barcode_q30_ratio"{print $2}' !{barcode_stats})
