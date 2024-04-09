@@ -196,9 +196,9 @@ obj <- NucleosomeSignal(object = obj)
 # compute TSS enrichment score per cell
 obj <- TSSEnrichment(object = obj, fast = FALSE)
 
-obj$high.tss <- ifelse(obj$TSS.enrichment > opt$TSS_enrichment_cutoff, 'High', 'Low')
+obj$high.tss <- ifelse(obj$TSS.enrichment > 3, 'High', 'Low')
 
-obj$nucleosome_group <- ifelse(obj$nucleosome_signal > opt$nucleosome_signal_cutoff, paste0('NS > ', opt$nucleosome_signal_cutoff), paste0('NS < ', opt$nucleosome_signal_cutoff))
+obj$nucleosome_group <- ifelse(obj$nucleosome_signal > 4, 'NS > 4', 'NS < 4')
 
 ## Calculate fragments in peaks for each cell
 total_fragments <- CountFragments(opt$fragment)
