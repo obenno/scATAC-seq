@@ -14,20 +14,10 @@ import string
 
 from threading import Lock
 lock = Lock()
-##from python import os
 
-# Written in seq.
+# Written in codon.
 #
-# Purpose: Extract barcodes from FASTQ file in BioRad design:
-#   https://github.com/caleblareau/bap/wiki/Working-with-BioRad-data
-#
-
-# Barcoded read design (original BioRad library structure)
-#									
-#    ATAC-v2.1	Bead-TTTTTTTUUUTTTTTAATGATACGGCGACCACCGAGATCTACACGCCTGTCCGCGGAAGCAGTGGTATCAACGCAGAGTACHHHHHHH[0-4]TATGCATGACHHHHHHHAGTCACTGAGHHHHHHHTGGTAGAGAGGGTG								
-#									
-#		BC1	Phase Block	Constant1	BC2	Constant2	BC3	Nextera A	ME
-#		HHHHHHH	none/A/CG/GCC/NVGC	TATGCATGAC	HHHHHHH	AGTCACTGAG	HHHHHHH	TCGTCGGCAGCGTC	AGATGTGTATAAGAGACAG
+# Purpose: Extract and correct barcodes from FASTQ file in ThunderBio design:
 
 # Adapter 1 and 2 in Kmer form.
 adapter1_kmer = k"GTGA"
@@ -92,17 +82,8 @@ r1_total_base = 0
 r2_q30_base = 0
 r2_total_base = 0
 
-##barcode_6bp_seqs_to_7bp: dict[seq, str] = dict[seq, str]()
-
-##for barcode_7bp_kmer in barcode_kmers:
-##    barcode_7bp_str = str(barcode_7bp_kmer)
-##    for i in range(0, 7):
-##        barcode_6bp_seq = seq(barcode_7bp_str[0:i] + barcode_7bp_str[i+1:7])
-##
-##        barcode_6bp_seqs_to_7bp[barcode_6bp_seq] = barcode_7bp_str
-
 ## TB has very short adapter sequence, no mismatch, insertion or deletion is allowed
-## although BC1, BC2 and BC3 are 9 bp, we only allow 1 mismatch, indels are not allowed
+## although BC1, BC2 and BC3 are 9 bp, we only allow 1 nt mismatch, indels are not allowed
 ## for 15 bp KM, we allow 1 mismatch, deletion or insertion
 
 KM_1deletion_set = set[KM_1deletion_kmer_type]()

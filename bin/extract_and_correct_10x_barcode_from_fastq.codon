@@ -18,7 +18,6 @@ lock = Lock()
 # Written in codon/seq.
 #
 # Purpose: Extract barcodes from FASTQ file in 10x design:
-#   https://github.com/caleblareau/bap/wiki/Working-with-BioRad-data
 #
 
 # Qual dict
