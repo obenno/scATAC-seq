@@ -1,0 +1,209 @@
+# Copyright (C) 2022-2023 Exaloop Inc. <https://exaloop.io>
+
+@__internal__
+class __internal__:
+    pass
+@__internal__
+class __magic__:
+    pass
+
+@tuple
+@__internal__
+class NoneType:
+    pass
+
+@tuple
+@__internal__
+@__notuple__
+class bool:
+    pass
+
+@tuple
+@__internal__
+@__notuple__
+class byte:
+    pass
+
+@tuple
+@__internal__
+@__notuple__
+class int:
+    MAX = 9223372036854775807
+    pass
+
+@tuple
+@__internal__
+@__notuple__
+class float:
+    MIN_10_EXP = -307
+    pass
+
+@tuple
+@__internal__
+@__notuple__
+class float32:
+    MIN_10_EXP = -37
+    pass
+
+@tuple
+@__internal__
+class type:
+    pass
+
+@tuple
+@__internal__
+@__notuple__
+class Function[T, TR]:
+    pass
+
+@tuple
+@__internal__
+class Callable[T, TR]:
+    pass
+
+@tuple
+@__internal__
+@__notuple__
+class Ptr[T]:
+    pass
+cobj = Ptr[byte]
+
+@tuple
+@__internal__
+@__notuple__
+class Generator[T]:
+    pass
+
+@tuple
+@__internal__
+@__notuple__
+class Optional:
+    T: type = NoneType
+
+@tuple
+@__internal__
+@__notuple__
+class Int[N: Static[int]]:
+    pass
+
+@tuple
+@__internal__
+@__notuple__
+class UInt[N: Static[int]]:
+    pass
+
+@__internal__
+class pyobj:
+    p: Ptr[byte]
+
+@tuple
+@__internal__
+class str:
+    ptr: Ptr[byte]
+    len: int
+
+@tuple
+@__internal__
+class Array:
+    len: int
+    ptr: Ptr[T]
+    T: type
+
+@extend
+class type:
+    def __new__(obj):
+        pass
+function = Function
+
+@__internal__
+class Ref[T]:
+    pass
+
+@tuple
+@__internal__
+@__notuple__
+class Union[TU]:
+    # compiler-generated
+    def __new__(val):
+        TU
+
+# dummy
+@__internal__
+class TypeVar[T]: pass
+@__internal__
+class ByVal: pass
+@__internal__
+class ByRef: pass
+@__internal__
+class Tuple: pass
+
+@__internal__
+class ClassVar[T]:
+    pass
+
+@__internal__
+class RTTI:
+    id: int
+
+@__internal__
+@tuple
+class ellipsis:
+    def __new__() -> ellipsis:
+        return ()
+Ellipsis = ellipsis()
+
+@tuple
+@__internal__
+class __array__:
+    T: type
+    def __new__(sz: Static[int]) -> Array[T]:
+        pass
+
+def __ptr__(var):
+    pass
+
+def staticlen(obj):
+    pass
+
+def compile_error(msg: Static[str]):
+    pass
+
+def isinstance(obj, what):
+    pass
+
+@__attribute__
+def overload():
+    pass
+
+def hasattr(obj, attr: Static[str], *args, **kwargs):
+    """Special handling"""
+    pass
+
+@overload
+def hasattr(obj, attr: Static[str]):
+    pass
+
+def getattr(obj, attr: Static[str]):
+    pass
+
+def setattr(obj, attr: Static[str], what):
+    pass
+
+def tuple(iterable):
+    pass
+
+def super():
+    pass
+
+def superf(*args):
+    """Special handling"""
+    pass
+
+def __realized__(fn, args):
+    pass
+
+def statictuple(*args):
+    return args
+
+def __has_rtti__(T: type):
+    pass

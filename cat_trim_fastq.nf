@@ -54,7 +54,7 @@ process CHECK_BARCODE {
     def pigzThreads = Math.min(6, task.cpus)
 
     """
-    extract_and_correct_thunderbio_barcode_from_fastq \\
+    $baseDir/codon/bin/codon run -release -plugin seq extract_and_correct_thunderbio_barcode_from_fastq.codon \\
     $whitelist_collapsed \\
     ${read1} \\
     ${read2} \\
@@ -133,7 +133,7 @@ process CHECK_BARCODE_10X {
     def pigzThreads = Math.min(6, task.cpus)
 
     """
-    extract_and_correct_10x_barcode_from_fastq \\
+    $baseDir/codon/bin/codon run -release -plugin seq extract_and_correct_10x_barcode_from_fastq.codon \\
     ${whitelist} \\
     ${read2} \\
     ${read1} \\
