@@ -28,9 +28,19 @@ include { REPORT } from './report'
 // https://github.com/nf-core/rnaseq
 def create_fastq_channel_TB(LinkedHashMap row) {
     def sample = [:]
-    //sample.name = row.sample
-    //sample.id = row.sample + "_" + row.rep
-    sample.id = row.sample
+
+    if(!row.sample){
+        exit 1, "ERROR: Please check sample list header and ensure that \"sample\" exists!\n"
+    }else{
+        sample.id = row.sample
+    }
+
+    if(!row.fastq_1){
+        exit 1, "ERROR: Please check sample list header and ensure that \"fastq_1\" exists!\n"
+    }
+    if(!row.fastq_2){
+        exit 1, "ERROR: Please check sample list header and ensure that \"fastq_2\" exists!\n"
+    }
     
     def array = []
     if (!file(row.fastq_1).exists()) {
@@ -49,10 +59,23 @@ def create_fastq_channel_TB(LinkedHashMap row) {
 
 def create_fastq_channel_10X(LinkedHashMap row) {
     def sample = [:]
-    //sample.name = row.sample
-    //sample.id = row.sample + "_" + row.rep
-    sample.id = row.sample
-    
+
+    if(!row.sample){
+        exit 1, "ERROR: Please check sample list header and ensure that \"sample\" exists!\n"
+    }else{
+        sample.id = row.sample
+    }
+
+    if(!row.fastq_1){
+        exit 1, "ERROR: Please check sample list header and ensure that \"fastq_1\" exists!\n"
+    }
+    if(!row.fastq_2){
+        exit 1, "ERROR: Please check sample list header and ensure that \"fastq_2\" exists!\n"
+    }
+    if(!row.fastq_3){
+        exit 1, "ERROR: Please check sample list header and ensure that \"fastq_3\" exists!\n"
+    }
+
     def array = []
     if (!file(row.fastq_1).exists()) {
         exit 1, "ERROR: Please check input samplesheet -> Read 1 FastQ file does not exist!\n${row.fastq_1}"
