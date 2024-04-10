@@ -52,6 +52,7 @@ suppressMessages(library(Seurat))
 suppressMessages(library(rtracklayer))
 suppressMessages(library(future))
 suppressMessages(library(reticulate))
+suppressMessages(library(DropletUtils))
 
 cmd <- commandArgs(trailingOnly = FALSE)
 script_path <- cmd[str_detect(cmd, "^--file")] %>%
@@ -123,7 +124,12 @@ if(fragmentCutoff < 200){
     message("otsu method threshold too small (< 200), set nCount cutoff to 200")
     fragmentCutoff <- 200
 }
-selectedCells <- colSums(counts)[colSums(counts) >= fragmentCutoff] %>% names
+otsu_cells <- colSums(counts)[colSums(counts) >= fragmentCutoff] %>% names
+
+## Use emptyDrops method to adjust cells
+ed_out<- emptyDrops(counts)
+emptyDrops_cells <- colnames(counts)[ed_out$FDR <= 0.001]
+selectedCells <- union(otsu_cells, emptyDrops_cells)
 write_tsv(tibble(cells = selectedCells), file = opt$raw_cells_out, col_names = FALSE)
 
 chrom_assay_raw <- CreateChromatinAssay(
