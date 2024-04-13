@@ -188,14 +188,14 @@ createModal("cellMetrics", expl_tbl)
 expl_tbl <- tribble(
     ~title, ~content,
     "Cell Cluster (Colored By Group)",
-    'The UMAP dimension reduction result of the cellular open chromatin region profile. Cell-peaks matrix was processed by latent semantic indexing (LSI) method implemented in <a href="https://stuartlab.org/signac/articles/pbmc_vignette#normalization-and-linear-dimensional-reduction">Signac</a> package, and clustered by  graph-based clustering method implemented in Seurat package. Cells were colored by cell clusters.'
+    'The UMAP dimension reduction result of the cellular open chromatin region profile. Cell-peaks matrix was processed by latent semantic indexing (LSI) method implemented in <a href="https://stuartlab.org/signac/articles/pbmc_vignette#normalization-and-linear-dimensional-reduction">Signac</a> package, and clustered by  graph-based clustering method implemented in Seurat package. Cells were colored by cell clusters. Please note we also discarded features observed in less than 10 cells and cells with less than 200 features.'
 )
 createModal("clusterCellGroups", expl_tbl)
 
 expl_tbl <- tribble(
     ~title, ~content,
     "Cell Cluster (Colored By Depth)",
-    'The UMAP dimension reduction result of the cellular open chromatin region profile. Cell-peaks matrix was processed by latent semantic indexing (LSI) method implemented in <a href="https://stuartlab.org/signac/articles/pbmc_vignette#normalization-and-linear-dimensional-reduction">Signac</a> package, and clustered by  graph-based clustering method implemented in Seurat package. Cells were colored by fragment counts (log-transformed).'
+    'The UMAP dimension reduction result of the cellular open chromatin region profile. Cell-peaks matrix was processed by latent semantic indexing (LSI) method implemented in <a href="https://stuartlab.org/signac/articles/pbmc_vignette#normalization-and-linear-dimensional-reduction">Signac</a> package, and clustered by  graph-based clustering method implemented in Seurat package. Cells were colored by fragment counts (log-transformed). Please note we also discarded features observed in less than 10 cells and cells with less than 200 features.'
 )
 createModal("clusterFragmentCounts", expl_tbl)
 
@@ -344,7 +344,7 @@ Row
 ### Estimated Number of Cells
 
 ```{r}
-valueBox(scales::label_comma()(length(cells)), caption = "Estimated number of cells", icon="fa-circle-notch", color="primary")
+valueBox(scales::label_comma()(length(raw_cells)), caption = "Estimated number of cells", icon="fa-circle-notch", color="primary")
 ```
 
 ### Median of Total Fragments in Cells
@@ -368,7 +368,7 @@ Row
 
 tribble(
   ~"", ~"",
-  "Estimated number of cells", scales::label_comma()(length(cells)),
+  "Estimated number of cells", scales::label_comma()(length(raw_cells)),
   "Mean fragments per cell", scales::label_comma()(cellFrag_mean),
   "Median fragments per cell", scales::label_comma()(cellFrag_median),
   "Mean of FRiP in cells", scales::label_percent(0.01)(cellFRiP_mean),

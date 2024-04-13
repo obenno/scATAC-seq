@@ -235,15 +235,15 @@ obj$blacklist_fraction <- FractionCountsInRegion(
 ##message("blacklist_fraction < ", opt$blacklist_fraction_cutoff)
 ##message("nucleosome_signal < ", opt$nucleosome_signal_cutoff)
 ##message("TSS.enrichment > ", opt$TSS_enrichment_cutoff)
-scATAC_obj <- subset(
-  x = obj,
-  subset = nCount_peaks > fragmentCutoff ##&
+##scATAC_obj <- subset(
+##  x = obj,
+##  subset = nCount_peaks > fragmentCutoff ##&
 ##    nCount_peaks < opt$nCount_max &
 ##    FRiP > opt$FRiP_cutoff &
 ##    blacklist_fraction < opt$blacklist_fraction_cutoff &
 ##    ##nucleosome_signal < opt$nucleosome_signal_cutoff &
 ##    ##TSS.enrichment > opt$TSS_enrichment_cutoff
-)
+##)
 
 filtered_cells <- Cells(scATAC_obj)
 message("Final cells: ", nrow(scATAC_obj[[]]))
