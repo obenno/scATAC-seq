@@ -3,14 +3,7 @@ process SIGNAC {
     label 'process_high'
     publishDir "${params.outdir}/${sampleID}/final",
         mode: "${params.publish_dir_mode}",
-        enabled: params.outdir as boolean,
-        saveAs: { filename ->
-        if(filename=~/cells_out\.tsv|\.rds/){
-            return filename
-        }else{
-            return null
-        }
-    }
+        enabled: params.outdir as boolean
 
     input:
     tuple val(sampleID), path(fragment), path(fragmentIndex)

@@ -1,7 +1,10 @@
 process GENERATE_FRAGMENTS {
     tag "${sampleID}"
     label 'process_high'
-
+    publishDir "${params.outdir}/${sampleID}/final",
+        mode: "${params.publish_dir_mode}",
+        enabled: params.outdir as boolean
+        
     input:
     tuple val(sampleID), path(bamFile), path(bamIndex)
 
