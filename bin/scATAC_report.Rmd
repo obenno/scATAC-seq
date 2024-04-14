@@ -167,7 +167,7 @@ createModal("seqStats", expl_tbl)
 expl_tbl <- tribble(
     ~title, ~content,
     "Cells Knee Plot",
-    'The Knee Plot is also called Barcode Rank Plot. The graph displays the number of fragments overlapping peaks assigned to each barcode. The blue color indicates cell associated barcodes, while grey ones are background barcodes. Cell associated barcodes were determined by <a href="https://en.wikipedia.org/wiki/Otsu%27s_method">otsu\'s method</a> which will auto-detect the knee point.'
+    'The Knee Plot is also called Barcode Rank Plot. The graph displays the number of fragments overlapping peaks assigned to each barcode. The blue color indicates cell associated barcodes, while grey ones are background barcodes. Cell associated barcodes were determined by <a href="https://en.wikipedia.org/wiki/Otsu%27s_method">otsu\'s method</a> followed by <a href="https://doi.org/10.1186/s13059-019-1662-y">EmptyDrops test</a>.'
 )
 createModal("kneePlot", expl_tbl)
 
