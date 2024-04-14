@@ -245,6 +245,7 @@ obj$blacklist_fraction <- FractionCountsInRegion(
 ##    ##TSS.enrichment > opt$TSS_enrichment_cutoff
 ##)
 
+scATAC_obj <- obj
 filtered_cells <- Cells(scATAC_obj)
 message("Final cells: ", nrow(scATAC_obj[[]]))
 
