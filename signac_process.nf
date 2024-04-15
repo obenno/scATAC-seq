@@ -25,6 +25,7 @@ process SIGNAC {
                      --gtf $gtf \\
                      -t $task.cpus \\
                      -m $nMem \\
+                     --emptyDrops_fdr ${params.emptyDrops_fdr} \\
                      --minCell ${params.minCell} \\
                      --minFeature ${params.minFeature} \\
                      --nCount_min ${params.nCountMin} \\

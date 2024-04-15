@@ -30,6 +30,8 @@ option_list <- list(
     ##            help = "Naive FRiP cutoff used when selecting cells"),
     ##make_option(c("--blacklist_fraction_cutoff"), type = "double", default = 0.05,
     ##            help = "Naive blacklist cutoff used when selecting cells"),
+    make_option(c("--emptyDrops_fdr"), type = "double", default = 0.001,
+                help = "FDR threshold for selecting cells different with ambientProfile of EmptyDrops algorithm"),
     make_option(c("--raw_cells_out"), type = "character", default = "cells.tsv",
                 help = "Output tsv file containing barcodes of the cells detected"),
     make_option(c("--raw_meta_metrics"), type = "character", default = "raw_meta.tsv",
@@ -129,7 +131,7 @@ otsu_cells <- colSums(counts)[colSums(counts) >= fragmentCutoff] %>% names
 ## Use emptyDrops method to adjust cells
 ed_out<- emptyDrops(counts)
 emptyDrops_cells <- colnames(counts)[ed_out$FDR <= 0.001]
-selectedCells <- union(otsu_cells, emptyDrops_cells)
+selectedCells <- union(otsu_cells, emptyDrops_cells) %>% na.omit()
 write_tsv(tibble(cells = selectedCells), file = opt$raw_cells_out, col_names = FALSE)
 
 chrom_assay_raw <- CreateChromatinAssay(
