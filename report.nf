@@ -12,6 +12,7 @@ process REPORT {
           path(filtered_obj),
           path(macs_peaks),
           path(saturation_json)
+    path(version_json)
 
     output:
     tuple val(sampleID), path("${sampleID}_scATAC_report.html"), emit: report
@@ -36,7 +37,8 @@ process REPORT {
             raw_meta = "$raw_meta",
             obj_filtered = "$filtered_obj",
             macs_peaks = "$macs_peaks",
-            saturation_json = "$saturation_json"
+            saturation_json = "$saturation_json",
+            version_json = "${version_json}"
         ),
         intermediates_dir = getwd(),
         knit_root_dir = getwd(),

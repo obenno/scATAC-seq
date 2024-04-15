@@ -21,6 +21,7 @@ include { SIGNAC } from './signac_process'
 include { DEDUP } from './dedup'
 include { CHECK_SATURATION } from './sequencing_saturation'
 include { GENERATE_FRAGMENTS } from './generate_fragment'
+include { GET_VERSIONS } from './present_version'
 include { REPORT } from './report'
 
 // Reads sample list in
@@ -271,6 +272,8 @@ workflow {
     STATS(
         ch_stats_input
     )
+
+    GET_VERSIONS()
     
     // join report input
     STATS.out.tsv
@@ -282,6 +285,7 @@ workflow {
     .set{ ch_report_input }
 
     REPORT(
-        ch_report_input
+        ch_report_input,
+        GET_VERSIONS.out.json
     )
 }

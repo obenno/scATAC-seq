@@ -21,6 +21,7 @@ params:
   obj_filtered: NULL
   macs_peaks: NULL
   saturation_json: NULL
+  version_json: NULL
 ---
 
 ```{r include=FALSE}
@@ -586,6 +587,31 @@ tssPlot %>% ggplotly() %>% config_plotly_fig() %>% toWebGL()
 ggplot(d, aes(x=fragments, y=TSS.enrichment, color=group))+geom_point(alpha=0.8)+scale_x_log10() + 
     theme_bw() + scale_color_manual(values=c("grey", "steelblue")) +
     theme(legend.title=element_blank(), panel.grid=element_blank())
+```
+
+Running Info {data-orientation=rows}
+====================
+
+Row
+----------
+
+### Running Information
+
+```{r}
+version_info <- fromJSON(params$version_json)
+version_tbl <- tribble(
+  ~term, ~value,
+  "Sample ID", params$sampleName,
+  "Pipeline Version", version_info$pipeline_version,
+  "Reference Genome", version_info$referenceGenome,
+  "Reference GTF", version_info$referenceGTF,
+  "BWA Index", version_info$bwa_index,
+  "BWA Version", version_info$bwa_version
+)
+names(version_tbl) <- c("", "")
+version_tbl %>% 
+    kbl() %>% 
+    kable_paper("hover", html_font = html_font)
 ```
 
 ```{js}
