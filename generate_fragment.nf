@@ -21,9 +21,23 @@ process GENERATE_FRAGMENTS {
     }else{
         chr_pattern = params.chrPattern
     }
+
+    // use barcodetag or barcode_regex option to extract barcode
+    
     """
     export TMPDIR="./"
-    sinto fragments -b $bamFile -p $task.cpus -f ${sampleID}.fragments.bed -t "CB"  --use_chrom "${chr_pattern}"
+    ## Added --collapse_within option, see https://github.com/timoast/sinto/issues/36
+    sinto fragments \\
+    -b $bamFile \\
+    -p $task.cpus \\
+    -f ${sampleID}.fragments.bed \\
+    --barcodetag ${params.barcodetag}  \\
+    --barcode_regex ${params.barcode_regex} \\
+    --use_chrom "${chr_pattern}" \\
+    --collapse_within \\
+    --max_distance ${params.max_distance} \\
+    --min_distance ${params.min_distance} \\
+    --chunksize ${params.chunksize}
     sort -k1,1 -k2,2n --parallel $task.cpus -S 256M ${sampleID}.fragments.bed > ${sampleID}.fragments.sorted.bed
     rm ${sampleID}.fragments.bed
     bgzip -@ $task.cpus ${sampleID}.fragments.sorted.bed
