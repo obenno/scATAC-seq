@@ -131,6 +131,13 @@ createModal <- function(Id, expl_tbl){
 }
 ```
 
+```{css}
+.explanation {
+  background-color: rgba(var(--bs-secondary-rgb), 0.2); 
+  border-radius: var(--bs-modal-border-radius);
+  padding: 1rem
+}
+```
 
 ```{r modal, echo = FALSE}
 expl_tbl <- tribble(
@@ -310,7 +317,7 @@ raw_cells <- read_tsv(params$raw_cells, col_names = FALSE) %>% pull()
 d <- read_tsv(params$raw_meta) ## counts = fragsOverlapPeaks
 
 d <- d %>% dplyr::arrange(desc(fragsOverlapPeaks)) %>%
-    dplyr::mutate(idx=1:nrow(d))
+    dplyr::mutate(idx=1:nrow(d), group = factor(group, levels = c("cell", "background")))
 
 ## Do not perform clustering when there are too few cells
 if(length(cells)>=150){
@@ -566,7 +573,7 @@ tribble(
 
 ```{r}
 ## Some points have FRiP larger than 1, needs to be removed
-ggplot(d, aes(x=fragments, y=FRiP, color=group))+geom_point(alpha=0.8)+scale_x_log10() + 
+ggplot(d, aes(x=fragments, y=FRiP, color=group))+geom_point(alpha=0.5, size=0.1)+scale_x_log10() + 
     theme_bw() + scale_color_manual(values=c("grey", "steelblue")) + ylim(0,1) +
     theme(legend.title=element_blank(), panel.grid=element_blank())
 ##ggplotly(p) %>% toWebGL()
@@ -584,7 +591,7 @@ tssPlot %>% ggplotly() %>% config_plotly_fig() %>% toWebGL()
 ### TSS Enrichment Distribution `r infoIcon("tssScatter")`
 
 ```{r}
-ggplot(d, aes(x=fragments, y=TSS.enrichment, color=group))+geom_point(alpha=0.8)+scale_x_log10() + 
+ggplot(d, aes(x=fragments, y=TSS.enrichment, color=group))+geom_point(alpha=0.5, size=0.1)+scale_x_log10() + 
     theme_bw() + scale_color_manual(values=c("grey", "steelblue")) +
     theme(legend.title=element_blank(), panel.grid=element_blank())
 ```
