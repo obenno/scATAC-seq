@@ -3,7 +3,7 @@ process GET_VERSIONS {
     label 'process_low'
 
     output:
-    tuple path("versions.json"), emit: json
+    path("versions.json"), emit: json
 
     script:
     """
