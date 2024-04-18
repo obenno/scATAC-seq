@@ -249,7 +249,7 @@ createModal("mappingStats", expl_tbl)
 expl_tbl <- tribble(
     ~title, ~content,
     "Insert Size",
-    "Histogram showing fragments size distribution."
+    "Histogram showing fragments size distribution. NS is nucleosome signal, which computes the ratio of mononucleosome fragments to nucleosome-free fragments."
 )
 createModal("fragmentsSize", expl_tbl)
 
@@ -260,7 +260,7 @@ expl_tbl <- tribble(
     "Peaks observed in cells",
     "Number of peaks observed in the cell associated barcodes.",
     "TSS enrichment score",
-    'Maximum value of the transcription start site (TSS) signal enrichment. The enrichment score was calculated by summarizing normalized read depth around reference TSS, please refer to <a href="https://www.encodeproject.org/data-standards/terms/">ENCODE website</a> for details. Here we used 2000 bp window (upstream 1000 bp + downstream 1000 bp) to keep the score consistent with cellranger report.'
+    'Maximum value of the transcription start site (TSS) signal enrichment. The enrichment score was calculated by summarizing normalized read depth around reference TSS, please refer to <a href="https://www.encodeproject.org/data-standards/terms/">ENCODE website</a> for details. Here we used 2000 bp window (upstream 1000 bp + downstream 1000 bp) to keep the score consistent with cellranger report. Here we grouped cells according to TSS enrichment score, the "high" group profiled all TSS sites of the cells with enrichment score larger than 3.'
 )
 createModal("peaks", expl_tbl)
 
@@ -416,7 +416,8 @@ Row {data-height=500}
 ### Cells Knee Plot `r infoIcon("kneePlot")`
 
 ```{r}
-fig <- plot_ly(data = d, x = ~idx, y = ~fragsOverlapPeaks, type = 'scatter', mode = 'lines',
+d0 <- d %>% mutate(group = factor(group, levels = c("background", "cell")))
+fig <- plot_ly(data = d0, x = ~idx, y = ~fragsOverlapPeaks, type = 'scatter', mode = 'lines',
                color = ~group, colors = c('grey', '#002366'),
                hovertemplate = 'Fragments: %{y}<extra>%{fullData.name}</extra>',
                line = list(width = 3),
@@ -434,8 +435,8 @@ p <- ggplot(d, aes(fragments, color=group, fill=group)) + geom_density(alpha=0.4
   xlab("Fragments") + 
   theme_bw() + 
   theme(panel.grid=element_blank(), legend.position=c(0.8,0.9), legend.title=element_blank()) +
-  scale_fill_manual(values=c("grey", "steelblue")) +
-  scale_color_manual(values=c("grey", "steelblue"))
+  scale_fill_manual(values=c("steelblue", "grey")) +
+  scale_color_manual(values=c("steelblue", "grey"))
 ggplotly(p) %>% config_plotly_fig() %>% toWebGL()
 ```
 
@@ -506,14 +507,14 @@ if(!is.null(params$saturation_json)){
   saturation_data <- fromJSON(params$saturation_json) %>%
       as_tibble() %>%
       mutate(across(everything(), .fns = as.numeric)) %>%
-      mutate(saturation = 1-uniqueFrags/seqDep) %>%
+      mutate(saturation = 1-total_frags/total_reads) %>%
       mutate(saturation = scales::label_percent(0.01)(saturation))
 }
 
-plot_ly(saturation_data, x= ~seqDep, y= ~uniqueFrags, text= ~saturation,
+plot_ly(saturation_data, x= ~total_reads, y= ~medianFragsInCells, text= ~saturation,
        type = 'scatter', mode = 'lines',
-       hovertemplate = 'Read Pairs: %{x}<br>Unique Fragments: %{y}<br>Saturation: %{text}<extra></extra>') %>%
-    layout(xaxis = list(title = 'Sequencing Read Depth'), yaxis = list(title = 'Total Fragments')) %>%
+       hovertemplate = 'Read Pairs: %{x}<br>Median of Fragments in Peaks: %{y}<br>Saturation: %{text}<extra></extra>') %>%
+    layout(xaxis = list(title = 'Sequencing Read Depth'), yaxis = list(title = 'Median Fragments Overlapping Peaks in Cells')) %>%
     config_plotly_fig() %>%
     toWebGL()
 ```
@@ -573,8 +574,8 @@ tribble(
 
 ```{r}
 ## Some points have FRiP larger than 1, needs to be removed
-ggplot(d, aes(x=fragments, y=FRiP, color=group))+geom_point(alpha=0.5, size=0.1)+scale_x_log10() + 
-    theme_bw() + scale_color_manual(values=c("grey", "steelblue")) + ylim(0,1) +
+ggplot(d, aes(x=fragments, y=FRiP, color=group))+geom_point(alpha=0.5, size=0.4)+scale_x_log10() + 
+    theme_bw() + scale_color_manual(values=c("steelblue", "grey")) + ylim(0,1) +
     theme(legend.title=element_blank(), panel.grid=element_blank())
 ##ggplotly(p) %>% toWebGL()
 ```
@@ -591,8 +592,8 @@ tssPlot %>% ggplotly() %>% config_plotly_fig() %>% toWebGL()
 ### TSS Enrichment Distribution `r infoIcon("tssScatter")`
 
 ```{r}
-ggplot(d, aes(x=fragments, y=TSS.enrichment, color=group))+geom_point(alpha=0.5, size=0.1)+scale_x_log10() + 
-    theme_bw() + scale_color_manual(values=c("grey", "steelblue")) +
+ggplot(d, aes(x=fragments, y=TSS.enrichment, color=group))+geom_point(alpha=0.5, size=0.4)+scale_x_log10() + 
+    theme_bw() + scale_color_manual(values=c("steelblue", "grey")) +
     theme(legend.title=element_blank(), panel.grid=element_blank())
 ```
 

@@ -3,21 +3,13 @@ process CHECK_SATURATION {
     label 'process_high'
 
     input:
-    tuple val(sampleID), path(inputBam), path(inputBamBai)
+    tuple val(sampleID), path(cellsTSV), path(peaks), path(fragments), path(fragIndex)
 
     output:
     tuple val(sampleID), path("${sampleID}.saturation_out.json"), emit: outJSON
 
     script:
-    // sinto fragments by default only recognize "chr" pattern in bam file
-    if(params.refGenome == "hg38" || params.refGenome == "mm10"){
-        chr_pattern = '(?i)^chr'
-    }else if(params.refGenome == "hg38-mm10"){
-        chr_pattern = '(?i)(^GRCh38_chr|^mm10___chr)'
-    }else{
-        chr_pattern = params.chrPattern
-    }
     """
-    get_sequencing_saturation.sh $inputBam "$chr_pattern" $task.cpus ${sampleID}.saturation_out.json
+    get_sequencing_saturation.v2.sh --frags ${fragments} --cells ${cellsTSV} --peaks ${peaks} --out ${sampleID}.saturation_out.json --threads $task.cpus
     """
 }

@@ -155,10 +155,6 @@ workflow {
             ch_read_stats
         )
 
-        CHECK_SATURATION(
-            ch_mapping_bam
-        )    
-
         GENERATE_FRAGMENTS(
             ch_mapping_bam
         )
@@ -170,6 +166,16 @@ workflow {
         SIGNAC(
             ch_fragment,
             ch_genomeGTF
+        )
+
+        SIGNAC.out.raw_cells
+        .join(SIGNAC.out.macs_peaks, by:[0])
+        .join(GENERATE_FRAGMENTS.out.fragmentFile, by:[0])
+        .join(GENERATE_FRAGMENTS.out.fragmentIndex, by:[0])
+        .set{ ch_saturation_input }
+
+        CHECK_SATURATION(
+            ch_saturation_input
         )
 
         // STATS input channel
@@ -238,10 +244,6 @@ workflow {
             ch_read_stats
         )
 
-        CHECK_SATURATION(
-            ch_mapping_bam
-        )    
-
         GENERATE_FRAGMENTS(
             ch_mapping_bam
         )
@@ -255,6 +257,16 @@ workflow {
             ch_genomeGTF
         )
 
+        SIGNAC.out.raw_cells
+        .join(SIGNAC.out.macs_peaks, by:[0])
+        .join(GENERATE_FRAGMENTS.out.fragmentFile, by:[0])
+        .join(GENERATE_FRAGMENTS.out.fragmentIndex, by:[0])
+        .set{ ch_saturation_input }
+
+        CHECK_SATURATION(
+            ch_saturation_input
+        )
+        
         // STATS input channel
         CHECK_BARCODE_10X.out.stats
         .join(TRIM_FASTQ.out.report_JSON, by:[0])
