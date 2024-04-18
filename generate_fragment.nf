@@ -23,7 +23,7 @@ process GENERATE_FRAGMENTS {
     }
 
     // use barcodetag or barcode_regex option to extract barcode
-    
+    def barcode_opts = params.barcode_regex ? "--barcode_regex $params.barcode_regex" : "--barcodetag $params.barcodetag"
     """
     export TMPDIR="./"
     ## Added --collapse_within option, see https://github.com/timoast/sinto/issues/36
@@ -31,8 +31,7 @@ process GENERATE_FRAGMENTS {
     -b $bamFile \\
     -p $task.cpus \\
     -f ${sampleID}.fragments.bed \\
-    --barcodetag ${params.barcodetag}  \\
-    --barcode_regex ${params.barcode_regex} \\
+    ${barcode_opts} \\
     --use_chrom "${chr_pattern}" \\
     --collapse_within \\
     --max_distance ${params.max_distance} \\
