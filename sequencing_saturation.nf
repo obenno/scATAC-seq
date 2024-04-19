@@ -1,6 +1,9 @@
 process CHECK_SATURATION {
     tag "${sampleID}"
     label 'process_high'
+    publishDir "${params.outdir}/${sampleID}/saturation",
+        mode: "${params.publish_dir_mode}",
+        enabled: params.outdir as boolean
 
     input:
     tuple val(sampleID), path(cellsTSV), path(peaks), path(fragments), path(fragIndex)
