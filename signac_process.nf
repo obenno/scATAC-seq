@@ -19,12 +19,16 @@ process SIGNAC {
     def prefix = "${sampleID}"
     def fastqcThreads = Math.min(4, task.cpus)
     def nMem = "${task.memory.toBytes()}"
+    def genomeSizeOpt = params.genomeSize ? "--genomeSize ${params.genomeSize}" : ""
+    def blackListOpt = params.blackList ? "--blacklistBED ${params.blackList}" : ""
     """
     signac_process.R -f $fragment \\
                      -g ${params.refGenome} \\
                      --gtf $gtf \\
                      -t $task.cpus \\
                      -m $nMem \\
+                     ${genomeSizeOpt} \\
+                     ${blackListOpt} \\
                      --emptyDrops_fdr ${params.emptyDrops_fdr} \\
                      --minCell ${params.minCell} \\
                      --minFeature ${params.minFeature} \\
