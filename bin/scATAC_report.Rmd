@@ -164,11 +164,11 @@ expl_tbl <- tribble(
     "ME containing read pairs",
     "The fraction of the valid barcode read pairs with ME sequence also detected",
     "Q30 bases in barcode",
-    "Percentage of the nucleotides in cell barcode with the sequencing quality larger than 30 (99% accuracy)",
+    "Percentage of the nucleotides in cell barcode with the sequencing quality larger than 30 (99.9% accuracy)",
     "Q30 bases in read 1",
-    "Percentage of the nucleotides in read 1 with sequencing quality larger than 30 (99% accuracy)",
+    "Percentage of the nucleotides in read 1 with sequencing quality larger than 30 (99.9% accuracy)",
     "Q30 bases in read 2",
-    "Percentage of the nucleotides in read 2 with sequencing quality larger than 30 (99% accuracy)"
+    "Percentage of the nucleotides in read 2 with sequencing quality larger than 30 (99.9% accuracy)"
 )
 createModal("seqStats", expl_tbl)
 
