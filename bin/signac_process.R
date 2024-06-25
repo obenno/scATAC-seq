@@ -130,7 +130,7 @@ otsu_cells <- colSums(counts)[colSums(counts) >= fragmentCutoff] %>% names
 
 ## Use emptyDrops method to adjust cells
 ed_out<- emptyDrops(counts)
-emptyDrops_cells <- colnames(counts)[ed_out$FDR <= 0.001]
+emptyDrops_cells <- colnames(counts)[ed_out$FDR <= opt$emptyDrops_fdr]
 selectedCells <- union(otsu_cells, emptyDrops_cells) %>% na.omit()
 write_tsv(tibble(cells = selectedCells), file = opt$raw_cells_out, col_names = FALSE)
 
