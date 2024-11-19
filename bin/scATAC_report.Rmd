@@ -374,7 +374,7 @@ Row
 
 ```{r}
 
-tribble(
+statsOut1 <- tribble(
   ~"", ~"",
   "Estimated number of cells", scales::label_comma()(length(raw_cells)),
   "Mean fragments per cell", scales::label_comma()(cellFrag_mean),
@@ -382,7 +382,11 @@ tribble(
   "Mean of FRiP in cells", scales::label_percent(0.01)(cellFRiP_mean),
   "Median of FRiP in cells", scales::label_percent(0.01)(cellFRiP_median)
   ##"Fraction of transposition events in peaks in cells", "100",
-) %>% kbl() %>% kable_paper("hover", html_font = html_font, font_size = "1rem") %>%
+)
+
+statsOut1 %>%
+  kbl() %>%
+  kable_paper("hover", html_font = html_font, font_size = "1rem") %>%
   column_spec(1, bold = T)
 ```
 
@@ -398,7 +402,7 @@ barcode_q30_ratio <- stats %>% filter(Term == "barcode_q30_ratio") %>% pull(valu
 r1_q30_ratio <- stats %>% filter(Term=="r1_q30_ratio") %>% pull(value) %>% as.numeric()
 r2_q30_ratio <- stats %>% filter(Term=="r2_q30_ratio") %>% pull(value) %>% as.numeric()
 
-tribble(
+statsOut2 <- tribble(
   ~"", ~"",
   "Raw read pairs", label_comma()(total_input_reads),
   "Valid barcodes", label_percent(0.01)(valid_barcode_ratio),
@@ -406,7 +410,11 @@ tribble(
   "Q30 bases in barcode", label_percent(0.01)(barcode_q30_ratio),
   "Q30 bases in read 1", label_percent(0.01)(r1_q30_ratio),
   "Q30 bases in read 2", label_percent(0.01)(r2_q30_ratio)
-) %>% kbl() %>% kable_paper("hover", html_font = html_font, font_size = "1rem") %>%
+)
+
+statsOut2 %>%
+  kbl() %>%
+  kable_paper("hover", html_font = html_font, font_size = "1rem") %>%
   column_spec(1, bold = T)
 ```
 
@@ -488,16 +496,19 @@ pbc2 <- stats %>% filter(Term=="pbc2") %>% pull(value) %>% as.numeric()
 nrf <- stats %>% filter(Term=="nrf") %>% pull(value) %>% as.numeric()
 duplicationReads <- stats %>% filter(Term=="duplicated_reads") %>% pull(value) %>% as.numeric()
 duplicationRatio <- duplicationReads/me_containing_reads
-tribble(
+
+statsOut3 <- tribble(
   ~"", ~"",
   "PBC1", label_number(0.01)(pbc1),
   "PBC2", label_number(0.01)(pbc2),
   "NRF", label_number(0.01)(nrf),
   "Duplication", label_percent(0.01)(duplicationRatio)
-) %>%
-kbl() %>% 
-kable_paper("hover", html_font = html_font, font_size = "1rem") %>%
-column_spec(1, bold = T)
+)
+
+statsOut3 %>%
+  kbl() %>% 
+  kable_paper("hover", html_font = html_font, font_size = "1rem") %>%
+  column_spec(1, bold = T)
 ```
 
 ### Sequencing Saturation `r infoIcon("saturationCurve")`
@@ -534,7 +545,7 @@ mito_frags <- stats %>% filter(Term == "mito_frags") %>% pull(value) %>% as.nume
 nfr_frags <- stats %>% filter(Term == "nfr_frags") %>% pull(value) %>% as.numeric()
 mono_frags <- stats %>% filter(Term == "mono_frags") %>% pull(value) %>% as.numeric()
 
-tribble(
+statsOut4 <- tribble(
   ~"", ~"",
   "Total mapped read pairs", scales::label_comma()(total_mapped_reads),
   "Total mapping rate", label_percent(0.01)(total_mapping_rate),
@@ -542,8 +553,10 @@ tribble(
   "Total fragments (after dedup)", scales::label_comma()(total_frags),
   "Mitochondrial fragments", paste0(scales::label_comma()(mito_frags), " (", label_percent(0.01)(mito_frags/total_frags),")"),
   "Fragments in nucleosome-free regions", paste0(scales::label_comma()(nfr_frags), " (", label_percent(0.01)(nfr_frags/total_frags),")"),
-  "Fragments in mono-nucleosome regions", paste0(scales::label_comma()(mono_frags), " (", label_percent(0.01)(mono_frags/total_frags),")"),
-) %>% kbl() %>% kable_paper("hover", html_font = html_font, font_size = "1rem") %>%
+  "Fragments in mono-nucleosome regions", paste0(scales::label_comma()(mono_frags), " (", label_percent(0.01)(mono_frags/total_frags),")")
+)
+
+statsOut4 %>% kbl() %>% kable_paper("hover", html_font = html_font, font_size = "1rem") %>%
   column_spec(1, bold = T)
 ```
 
@@ -561,12 +574,16 @@ Row
 ```{r}
 tss_score <- obj_filtered@assays$peaks@positionEnrichment$TSS %>% apply(2, mean) %>% max()
 raw_peaks_num <- read_tsv(params$macs_peaks) %>% nrow
-tribble(
+statsOut5 <- tribble(
   ~"", ~"",
   "Raw macs2 peaks", scales::label_comma()(raw_peaks_num),
   "Peaks observed in cells", scales::label_comma()(nrow(obj_filtered)),
   "TSS enrichment score", scales::label_number(0.01)(tss_score)
-) %>% kbl() %>% kable_paper("hover", html_font = html_font, font_size = "1rem") %>%
+)
+
+statsOut5 %>%
+  kbl() %>%
+  kable_paper("hover", html_font = html_font, font_size = "1rem") %>%
   column_spec(1, bold = T)
 ```
 
@@ -635,5 +652,19 @@ stats <- stats %>%
     add_row(Term = "q30_mapping_rate", value = as.character(q30_mapping_rate), .after = 13) %>%
     add_row(Term = "valid_barcode_ratio", value = as.character(valid_barcode_ratio), .after = 8)
 
-write_tsv(stats, file = paste0(params$sampleName, "_combined_stats.tsv"))
+write_tsv(stats, file = paste0(params$sampleName, "_combined_stats.tsv.gz"))
+```
+
+```{r include=FALSE}
+statsOut <- bind_rows(
+  statsOut1,
+  statsOut2,
+  statsOut3,
+  statsOut4
+)
+colnames(statsOut) <- c("item", "value")
+statsOut %>%
+  add_row(item = "sampleID", value = params$sampleName, .before = 1) %>%
+  pivot_wider(names_from=item, values_from=value) %>%
+  write_json(paste0(params$sampleName, ".metrics.json"), pretty=TRUE)
 ```

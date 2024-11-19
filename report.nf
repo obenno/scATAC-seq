@@ -17,6 +17,7 @@ process REPORT {
     output:
     tuple val(sampleID), path("${sampleID}_scATAC_report.html"), emit: report
     tuple val(sampleID), path("${sampleID}_combined_stats.tsv"), emit: stats
+    tuple val(sampleID), path("${sampleID}.metrics.json"), emit: metrics
 
     script:
     def nMem = "${task.memory.toBytes()}"
