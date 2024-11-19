@@ -108,6 +108,9 @@ annotations <- annotations[annotations$gene_biotype %in% c("protein_coding", "li
 
 ## Perform analysis
 frag <- CreateFragmentObject(opt$fragment)
+## Update fragment object path slot, using relative path
+slot(object = frag, name = "path") <- opt$fragment
+
 macs_peaks <- CallPeaks(frag, macs2.path = NULL,
                         outdir = "./",
                         effective.genome.size = genomeSize,
