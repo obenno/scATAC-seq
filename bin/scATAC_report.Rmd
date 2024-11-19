@@ -660,7 +660,8 @@ statsOut <- bind_rows(
   statsOut1,
   statsOut2,
   statsOut3,
-  statsOut4
+  statsOut4,
+  statsOut5
 )
 colnames(statsOut) <- c("item", "value")
 statsOut %>%
