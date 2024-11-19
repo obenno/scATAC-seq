@@ -84,7 +84,7 @@ process STATS {
     nfr_fragments=$(cat nfr_frag_count)
     mono_fragments=$(cat mono_frag_count)
 
-    nCells=$(wc -l !{cells_tsv} | awk '{print $1}')
+    nCells=$(zcat !{cells_tsv} | wc -l | awk '{print $1}')
 
     ## summarize
     echo -e "sampleID\\t!{sampleID}" > !{sampleID}_stats.tsv

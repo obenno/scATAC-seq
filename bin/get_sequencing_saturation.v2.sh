@@ -6,7 +6,7 @@ usage(){
     cat<<-EOF
 Calculate saturation data from fragments file:
 
-$(basename $0) --frags fragments.bed.gz --cells cells.tsv --peaks macs2_peaks --out out.json
+$(basename $0) --frags fragments.bed.gz --cells cells.tsv.gz --peaks macs2_peaks --out out.json
 EOF
 }
 

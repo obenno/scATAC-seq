@@ -10,8 +10,8 @@ process SIGNAC {
     path(gtf)
 
     output:
-    tuple val(sampleID), path("${sampleID}_raw_cells.tsv"),    emit: raw_cells
-    tuple val(sampleID), path("${sampleID}_raw_meta.tsv"),    emit: raw_meta
+    tuple val(sampleID), path("${sampleID}_raw_cells.tsv.gz"),    emit: raw_cells
+    tuple val(sampleID), path("${sampleID}_raw_meta.tsv.gz"),    emit: raw_meta
     tuple val(sampleID), path("${sampleID}_filtered_obj.rds"), emit: obj
     tuple val(sampleID), path("${sampleID}_macs2_peaks.narrowPeak"), emit: macs_peaks
 
@@ -33,8 +33,8 @@ process SIGNAC {
                      --minCell ${params.minCell} \\
                      --minFeature ${params.minFeature} \\
                      --nCount_min ${params.nCountMin} \\
-                     --raw_cells_out ${sampleID}_raw_cells.tsv \\
-                     --raw_meta_metrics ${sampleID}_raw_meta.tsv \\
+                     --raw_cells_out ${sampleID}_raw_cells.tsv.gz \\
+                     --raw_meta_metrics ${sampleID}_raw_meta.tsv.gz \\
                      --obj_out ${sampleID}_filtered_obj.rds
     mv macs2_peaks.narrowPeak ${sampleID}_macs2_peaks.narrowPeak
     """
