@@ -7,7 +7,7 @@
 FROM quay.io/condaforge/miniforge3
 
 ## Maintainer
-MAINTAINER Zhixia Xiao <obennoname@gmail.com>
+LABEL org.opencontainers.image.authors="Zhixia Xiao obennoname@gmail.com"
 
 ## Setup conda env
 USER root
@@ -24,12 +24,13 @@ WORKDIR /app
 ## All the packages will be installed to base env and no need to activate
 ## specific package in entrypoint.sh
 COPY scATAC_env.yml .
-RUN mamba env update -n base -f scATAC_env.yml && rm scATAC_env.yml
+##RUN mamba env update -n base -f scATAC_env.yml && rm scATAC_env.yml
+RUN mamba env create -f scATAC_env.yml && mamba clean --all && rm scATAC_env.yml
 
 ## copy entrypoint.sh
-##COPY entrypoint.sh .
+COPY entrypoint.sh .
 
-##RUN chmod +x entrypoint.sh
+RUN chmod +x entrypoint.sh
 
 ## Follow Dockstore's guide
 ## switch back to the ubuntu user so this tool (and the files written) are not owned by root
@@ -37,4 +38,4 @@ RUN groupadd -r -g 1000 ubuntu && useradd -m -r -g ubuntu -u 1000 ubuntu
 RUN chown -R ubuntu: /app
 USER ubuntu
 
-##ENTRYPOINT ["/app/entrypoint.sh"]
+ENTRYPOINT ["/app/entrypoint.sh"]
