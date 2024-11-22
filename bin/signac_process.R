@@ -108,8 +108,6 @@ annotations <- annotations[annotations$gene_biotype %in% c("protein_coding", "li
 
 ## Perform analysis
 frag <- CreateFragmentObject(opt$fragment)
-## Update fragment object path slot, using relative path
-slot(object = frag, name = "path") <- opt$fragment
 
 macs_peaks <- CallPeaks(frag, macs2.path = NULL,
                         outdir = "./",
@@ -277,4 +275,13 @@ if(length(filtered_cells)>=150){
     scATAC_obj <- FindClusters(object = scATAC_obj, verbose = FALSE, algorithm = 3)
 }
 
+## Update fragment object path slot, using relative path
+fragments <- CreateFragmentObject(
+  path = opt$fragment,
+  cells = colnames(scATAC_obj),
+  validate.fragments = FALSE
+)
+slot(fragments, name = "path") <- base::basename(opt$fragment)
+Fragments(scATAC_obj) <- NULL
+Fragments(scATAC_obj) <- fragments
 saveRDS(scATAC_obj, file = opt$obj_out)

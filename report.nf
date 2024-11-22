@@ -10,6 +10,8 @@ process REPORT {
           path(raw_cells),
           path(raw_meta),
           path(filtered_obj),
+          path(fragments),
+          path(fragmentIndex),
           path(macs_peaks),
           path(saturation_json)
     path(version_json)

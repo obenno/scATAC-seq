@@ -292,6 +292,8 @@ workflow {
     .join(SIGNAC.out.raw_cells, by:[0])
     .join(SIGNAC.out.raw_meta, by:[0])
     .join(SIGNAC.out.obj, by:[0])
+    .join(GENERATE_FRAGMENTS.out.fragmentFile, by:[0])
+    .join(GENERATE_FRAGMENTS.out.fragmentIndex, by:[0])
     .join(SIGNAC.out.macs_peaks, by:[0])
     .join(CHECK_SATURATION.out.outJSON, by:[0])
     .set{ ch_report_input }
