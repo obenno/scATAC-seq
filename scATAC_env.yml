@@ -2,7 +2,7 @@ name: starscope_scATAC_env
 channels:
   - conda-forge
   - bioconda
-  - defaults
+  - nodefaults
 dependencies:
   - samtools>=1.9
   - bedtools>=2.25
