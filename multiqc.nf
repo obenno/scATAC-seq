@@ -1,7 +1,7 @@
 process MULTIQC {
-    tag "${sampleID}"
+    tag "${sample.id}"
     label 'process_low'
-    publishDir "${params.outdir}/${sampleID}/multiqc",
+    publishDir "${params.outdir}/${sample.id}/multiqc",
         mode: "${params.publish_dir_mode}",
         enabled: params.outdir as boolean,
         saveAs: { filename ->
@@ -13,7 +13,7 @@ process MULTIQC {
     }
 
     input:
-    tuple val(sampleID),
+    tuple val(sample),
           path(read1_before),
           path(read2_before),
           path(read1_after),
@@ -22,10 +22,10 @@ process MULTIQC {
           path(bam_stats)
 
     output:
-    tuple val(sampleID), path("${sampleID}_multiqc_report.html"), emit: report    
+    tuple val(sample), path("${sample.id}_multiqc_report.html"), emit: report
 
     script:
-    def prefix = "${sampleID}"
+    def prefix = "${sample.id}"
     def fastqcThreads = Math.min(4, task.cpus)
     """
     ## rename input files

@@ -36,6 +36,16 @@ def create_fastq_channel_TB(LinkedHashMap row) {
         sample.id = row.sample
     }
 
+    if(!row.expected_cells && params.topCells){
+        exit 1, "ERROR: Please check input samplesheet -> Please specify expected_cells column"
+    }else if(!params.topCells){
+        sample.expected_cells = 0
+    }else{
+        def expected_cells = row.expected_cells as Integer
+        assert expected_cells.getClass() == Integer
+        sample.expected_cells = expected_cells
+    }
+
     if(!row.fastq_1){
         exit 1, "ERROR: Please check sample list header and ensure that \"fastq_1\" exists!\n"
     }
@@ -53,7 +63,7 @@ def create_fastq_channel_TB(LinkedHashMap row) {
     }
 
     //array = [ sample.id, sample.name, file(row.fastq_1), file(row.fastq_2) ]
-    array = [ sample.id, file(row.fastq_1), file(row.fastq_2) ]
+    array = [ sample, file(row.fastq_1), file(row.fastq_2) ]
 
     return array
 }
@@ -65,6 +75,16 @@ def create_fastq_channel_10X(LinkedHashMap row) {
         exit 1, "ERROR: Please check sample list header and ensure that \"sample\" exists!\n"
     }else{
         sample.id = row.sample
+    }
+
+    if(!row.expected_cells && params.topCells){
+        exit 1, "ERROR: Please check input samplesheet -> Please specify expected_cells column"
+    }else if(!params.topCells){
+        sample.expected_cells = 0
+    }else{
+        def expected_cells = row.expected_cells as Integer
+        assert expected_cells.getClass() == Integer
+        sample.expected_cells = expected_cells
     }
 
     if(!row.fastq_1){
@@ -90,7 +110,7 @@ def create_fastq_channel_10X(LinkedHashMap row) {
         exit 1, "ERROR: Please check input samplesheet -> Read 3 FastQ file does not exist!\n${row.fastq_3}"
     }
 
-    array = [ sample.id, file(row.fastq_1), file(row.fastq_2), file(row.fastq_3) ]
+    array = [ sample, file(row.fastq_1), file(row.fastq_2), file(row.fastq_3) ]
 
     return array
 }

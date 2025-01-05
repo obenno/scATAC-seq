@@ -1,17 +1,17 @@
 process BWA_MAPPING {
-    tag "${sampleID}"
+    tag "${sample.id}"
     label 'process_high'
 
     input:
-    tuple val(sampleID), path(read1), path(read2)
+    tuple val(sample), path(read1), path(read2)
     path index
 
     output:
-    tuple val(sampleID), path("${sampleID}.bwa_mapping.sorted.bam")           , emit: bam
-    tuple val(sampleID), path("${sampleID}.bwa_mapping.sorted.bam.bai")       , emit: bai
+    tuple val(sample), path("${sample.id}.bwa_mapping.sorted.bam")           , emit: bam
+    tuple val(sample), path("${sample.id}.bwa_mapping.sorted.bam.bai")       , emit: bai
 
     script:
-    def prefix     = "${sampleID}"
+    def prefix     = "${sample.id}"
     def genomeIndex = index.collect{ it.toString() }[0].split("\\.")[0]
     """
     bwa-mem2 mem \\
@@ -29,18 +29,18 @@ process BWA_MAPPING {
 }
 
 process BAM_SUMMARY {
-    tag "${sampleID}"
+    tag "${sample.id}"
     label 'process_low'
 
     input:
-    tuple val(sampleID), path(inputBam), path(inputBamBai)
+    tuple val(sample), path(inputBam), path(inputBamBai)
 
     output:
-    tuple val(sampleID), path("${sampleID}.mapping_stats.tsv") ,emit: tsv
+    tuple val(sample), path("${sample.id}.mapping_stats.tsv") ,emit: tsv
 
     script:
     def stats_threads = Math.min(2, task.cpus)
     """
-    samtools stats -@ $task.cpus $inputBam > ${sampleID}.mapping_stats.tsv
+    samtools stats -@ $task.cpus $inputBam > ${sample.id}.mapping_stats.tsv
     """
 }

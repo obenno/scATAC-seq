@@ -1,16 +1,16 @@
 process GENERATE_FRAGMENTS {
-    tag "${sampleID}"
+    tag "${sample.id}"
     label 'process_high'
-    publishDir "${params.outdir}/${sampleID}/final",
+    publishDir "${params.outdir}/${sample.id}/final",
         mode: "${params.publish_dir_mode}",
         enabled: params.outdir as boolean
         
     input:
-    tuple val(sampleID), path(bamFile), path(bamIndex)
+    tuple val(sample), path(bamFile), path(bamIndex)
 
     output:
-    tuple val(sampleID), path("${sampleID}.fragments.sorted.bed.gz")       , emit: fragmentFile
-    tuple val(sampleID), path("${sampleID}.fragments.sorted.bed.gz.tbi")   , emit: fragmentIndex
+    tuple val(sample), path("${sample.id}.fragments.sorted.bed.gz")       , emit: fragmentFile
+    tuple val(sample), path("${sample.id}.fragments.sorted.bed.gz.tbi")   , emit: fragmentIndex
 
     script:
     // sinto fragments by default only recognize "chr" pattern in bam file
@@ -30,16 +30,16 @@ process GENERATE_FRAGMENTS {
     sinto fragments \\
     -b $bamFile \\
     -p $task.cpus \\
-    -f ${sampleID}.fragments.bed \\
+    -f ${sample.id}.fragments.bed \\
     ${barcode_opts} \\
     --use_chrom "${chr_pattern}" \\
     --collapse_within \\
     --max_distance ${params.max_distance} \\
     --min_distance ${params.min_distance} \\
     --chunksize ${params.chunksize}
-    sort -k1,1 -k2,2n --parallel $task.cpus -S 256M ${sampleID}.fragments.bed > ${sampleID}.fragments.sorted.bed
-    rm ${sampleID}.fragments.bed
-    bgzip -@ $task.cpus ${sampleID}.fragments.sorted.bed
-    tabix -p bed ${sampleID}.fragments.sorted.bed.gz
+    sort -k1,1 -k2,2n --parallel $task.cpus -S 256M ${sample.id}.fragments.bed > ${sample.id}.fragments.sorted.bed
+    rm ${sample.id}.fragments.bed
+    bgzip -@ $task.cpus ${sample.id}.fragments.sorted.bed
+    tabix -p bed ${sample.id}.fragments.sorted.bed.gz
     """
 }

@@ -30,6 +30,8 @@ option_list <- list(
     ##            help = "Naive FRiP cutoff used when selecting cells"),
     ##make_option(c("--blacklist_fraction_cutoff"), type = "double", default = 0.05,
     ##            help = "Naive blacklist cutoff used when selecting cells"),
+    make_option(c("--topCells"), type = "integer", default = 0,
+                help = "Set topCells other than 0 to manually select cells instead of otsu/emptyDrops"),
     make_option(c("--emptyDrops_fdr"), type = "double", default = 0.001,
                 help = "FDR threshold for selecting cells different with ambientProfile of EmptyDrops algorithm"),
     make_option(c("--raw_cells_out"), type = "character", default = "cells.tsv",
@@ -116,23 +118,27 @@ macs_peaks <- CallPeaks(frag, macs2.path = NULL,
 counts <- FeatureMatrix(fragments = frag, features = macs_peaks,
                         sep= c(":", "-"))
 
-## cell calling based fragments overlap peaks threshold selected by ostu algorithm
-fragmentCutoff <- threshold_otsu(array(colSums(counts)))
-message("otsu method threshold: ", fragmentCutoff)
+if(opt$topCells > 0){
+    selectedCells <- colSums(counts) %>% sort(decreasing=TRUE) %>% head(opt$topCells) %>% names
+}else if(opt$topCells == 0){
+    ## cell calling based fragments overlap peaks threshold selected by ostu algorithm
+    fragmentCutoff <- threshold_otsu(array(colSums(counts)))
+    message("otsu method threshold: ", fragmentCutoff)
 
-if(opt$nCount_min > fragmentCutoff){
-    fragmentCutoff <- opt$nCount_min
-}
-if(fragmentCutoff < 200){
-    message("otsu method threshold too small (< 200), set nCount cutoff to 200")
-    fragmentCutoff <- 200
-}
-otsu_cells <- colSums(counts)[colSums(counts) >= fragmentCutoff] %>% names
+    if(opt$nCount_min > fragmentCutoff){
+        fragmentCutoff <- opt$nCount_min
+    }
+    if(fragmentCutoff < 200){
+        message("otsu method threshold too small (< 200), set nCount cutoff to 200")
+        fragmentCutoff <- 200
+    }
 
-## Use emptyDrops method to adjust cells
-ed_out<- emptyDrops(counts)
-emptyDrops_cells <- colnames(counts)[ed_out$FDR <= opt$emptyDrops_fdr]
-selectedCells <- union(otsu_cells, emptyDrops_cells) %>% na.omit()
+    ## Use emptyDrops method to adjust cells
+    ed_out<- emptyDrops(counts, by.rank=TRUE, retain = fragmentCutoff)
+    selectedCells <- ed_out[which(ed_out$FDR<=0.001), ] %>% rownames()
+}else{
+    stop("topCells cannot be set to negative value.")
+}
 write_tsv(tibble(cells = selectedCells), file = opt$raw_cells_out, col_names = FALSE)
 
 chrom_assay_raw <- CreateChromatinAssay(

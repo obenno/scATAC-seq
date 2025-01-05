@@ -1,9 +1,9 @@
 process STATS {
-    tag "${sampleID}"
+    tag "${sample.id}"
     label 'process_high'
 
     input:
-    tuple val(sampleID),
+    tuple val(sample),
           path(barcode_stats),
           path(cutadapt_json),
           path(bam_stats),
@@ -15,9 +15,9 @@ process STATS {
           path(cells_tsv)
 
     output:
-    tuple val(sampleID), path("${sampleID}_stats.tsv"), emit: tsv
-    tuple val(sampleID), path("${sampleID}.fragments.sorted.bed.gz"), emit: fragments
-    tuple val(sampleID), path("${sampleID}.fragments.sorted.bed.gz.tbi"), emit: fragmentIndex
+    tuple val(sample), path("${sample.id}_stats.tsv"), emit: tsv
+    tuple val(sample), path("${sample.id}.fragments.sorted.bed.gz"), emit: fragments
+    tuple val(sample), path("${sample.id}.fragments.sorted.bed.gz.tbi"), emit: fragmentIndex
 
     shell:
     '''
@@ -87,24 +87,24 @@ process STATS {
     nCells=$(zcat !{cells_tsv} | wc -l | awk '{print $1}')
 
     ## summarize
-    echo -e "sampleID\\t!{sampleID}" > !{sampleID}_stats.tsv
-    echo -e "cells\\t$nCells" >> !{sampleID}_stats.tsv
-    echo -e "total_input_reads\\t$total_input_readPairs" >> !{sampleID}_stats.tsv
-    echo -e "valid_barcode_reads\\t$valid_barcode_readPairs" >> !{sampleID}_stats.tsv
-    echo -e "me_containing_reads\\t$with_me_q30_readPairs" >> !{sampleID}_stats.tsv
-    echo -e "total_mapped_reads\\t$total_mapped_readPairs" >> !{sampleID}_stats.tsv
-    ##echo -e "uniquely_mapped_reads\\t$uniquely_mapped_readPairs" >> !{sampleID}_stats.tsv
-    echo -e "q30_mapped_reads\\t$q30_readPairs" >> !{sampleID}_stats.tsv
-    echo -e "duplicated_reads\\t$duplicated_readPairs" >> !{sampleID}_stats.tsv
-    echo -e "barcode_q30_ratio\\t$barcode_q30_ratio" >> !{sampleID}_stats.tsv
-    echo -e "r1_q30_ratio\\t$r1_q30_ratio" >> !{sampleID}_stats.tsv
-    echo -e "r2_q30_ratio\\t$r2_q30_ratio" >> !{sampleID}_stats.tsv
-    echo -e "total_frags\\t$total_fragments" >> !{sampleID}_stats.tsv
-    echo -e "mito_frags\\t$mito_fragments" >> !{sampleID}_stats.tsv
-    echo -e "nfr_frags\\t$nfr_fragments" >> !{sampleID}_stats.tsv
-    echo -e "mono_frags\\t$mono_fragments" >> !{sampleID}_stats.tsv
-    echo -e "pbc1\\t$pbc1" >> !{sampleID}_stats.tsv
-    echo -e "pbc2\\t$pbc2" >> !{sampleID}_stats.tsv
-    echo -e "nrf\\t$NRF" >> !{sampleID}_stats.tsv
+    echo -e "sampleID\\t!{sample.id}" > !{sample.id}_stats.tsv
+    echo -e "cells\\t$nCells" >> !{sample.id}_stats.tsv
+    echo -e "total_input_reads\\t$total_input_readPairs" >> !{sample.id}_stats.tsv
+    echo -e "valid_barcode_reads\\t$valid_barcode_readPairs" >> !{sample.id}_stats.tsv
+    echo -e "me_containing_reads\\t$with_me_q30_readPairs" >> !{sample.id}_stats.tsv
+    echo -e "total_mapped_reads\\t$total_mapped_readPairs" >> !{sample.id}_stats.tsv
+    ##echo -e "uniquely_mapped_reads\\t$uniquely_mapped_readPairs" >> !{sample.id}_stats.tsv
+    echo -e "q30_mapped_reads\\t$q30_readPairs" >> !{sample.id}_stats.tsv
+    echo -e "duplicated_reads\\t$duplicated_readPairs" >> !{sample.id}_stats.tsv
+    echo -e "barcode_q30_ratio\\t$barcode_q30_ratio" >> !{sample.id}_stats.tsv
+    echo -e "r1_q30_ratio\\t$r1_q30_ratio" >> !{sample.id}_stats.tsv
+    echo -e "r2_q30_ratio\\t$r2_q30_ratio" >> !{sample.id}_stats.tsv
+    echo -e "total_frags\\t$total_fragments" >> !{sample.id}_stats.tsv
+    echo -e "mito_frags\\t$mito_fragments" >> !{sample.id}_stats.tsv
+    echo -e "nfr_frags\\t$nfr_fragments" >> !{sample.id}_stats.tsv
+    echo -e "mono_frags\\t$mono_fragments" >> !{sample.id}_stats.tsv
+    echo -e "pbc1\\t$pbc1" >> !{sample.id}_stats.tsv
+    echo -e "pbc2\\t$pbc2" >> !{sample.id}_stats.tsv
+    echo -e "nrf\\t$NRF" >> !{sample.id}_stats.tsv
     '''
 }

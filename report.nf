@@ -1,11 +1,11 @@
 process REPORT {
-    tag "${sampleID}"
+    tag "${sample.id}"
     label 'process_high'
-    publishDir "${params.outdir}/${sampleID}/final",
+    publishDir "${params.outdir}/${sample.id}/final",
         mode: "${params.publish_dir_mode}",
         enabled: params.outdir as boolean
     input:
-    tuple val(sampleID),
+    tuple val(sample),
           path(stats_tsv),
           path(raw_cells),
           path(raw_meta),
@@ -17,9 +17,9 @@ process REPORT {
     path(version_json)
 
     output:
-    tuple val(sampleID), path("${sampleID}_scATAC_report.html"), emit: report
-    tuple val(sampleID), path("${sampleID}_combined_stats.tsv.gz"), emit: stats
-    tuple val(sampleID), path("${sampleID}.metrics.json"), emit: metrics
+    tuple val(sample), path("${sample.id}_scATAC_report.html"), emit: report
+    tuple val(sample), path("${sample.id}_combined_stats.tsv.gz"), emit: stats
+    tuple val(sample), path("${sample.id}.metrics.json"), emit: metrics
 
     script:
     def nMem = "${task.memory.toBytes()}"
@@ -32,7 +32,7 @@ process REPORT {
     rmarkdown::render(
         "$baseDir/bin/${rmdScript}",
         params = list(
-            sampleName = "${sampleID}",
+            sampleName = "${sample.id}",
             nCPUs = $task.cpus,
             nMem = "${nMem}",
             stats_tsv = "$stats_tsv",
@@ -46,7 +46,7 @@ process REPORT {
         intermediates_dir = getwd(),
         knit_root_dir = getwd(),
         output_dir = getwd(),
-        output_file = "${sampleID}_scATAC_report.html"
+        output_file = "${sample.id}_scATAC_report.html"
     )
     """
 }

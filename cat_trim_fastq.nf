@@ -1,16 +1,16 @@
 process CAT_FASTQ {
-    tag "${sampleID}"
+    tag "${sample.id}"
     label 'process_high'
 
     input:
-    tuple val(sampleID), path(read1_list), path(read2_list)
+    tuple val(sample), path(read1_list), path(read2_list)
 
     output:
-    tuple val(sampleID), path("${sampleID}_1.merged.fq.gz"),         emit: read1
-    tuple val(sampleID), path("${sampleID}_2.merged.fq.gz"),         emit: read2
+    tuple val(sample), path("${sample.id}_1.merged.fq.gz"),         emit: read1
+    tuple val(sample), path("${sample.id}_2.merged.fq.gz"),         emit: read2
 
     script:
-    def prefix   = "${sampleID}"
+    def prefix   = "${sample.id}"
     def read1 = read1_list.collect{ it.toString() }
     def read2 = read2_list.collect{ it.toString() }
     scriptString = []
@@ -36,20 +36,20 @@ process CAT_FASTQ {
 
 
 process CHECK_BARCODE {
-    tag "${sampleID}"
+    tag "${sample.id}"
     label 'process_high'
 
     input:
-    tuple val(sampleID), path(read1), path(read2)
+    tuple val(sample), path(read1), path(read2)
     path(whitelist)
 
     output:
-    tuple val(sampleID), path("${sampleID}_1.cutadapt_input.fq.gz"), emit: read1
-    tuple val(sampleID), path("${sampleID}_2.cutadapt_input.fq.gz"), emit: read2
-    tuple val(sampleID), path("${sampleID}_barcode_stats.tsv"),      emit: stats
+    tuple val(sample), path("${sample.id}_1.cutadapt_input.fq.gz"), emit: read1
+    tuple val(sample), path("${sample.id}_2.cutadapt_input.fq.gz"), emit: read2
+    tuple val(sample), path("${sample.id}_barcode_stats.tsv"),      emit: stats
 
     script:
-    def prefix   = "${sampleID}"
+    def prefix   = "${sample.id}"
     def whitelist_collapsed = whitelist.collect{ it.toString() }.join(',')
     def pigzThreads = Math.min(6, task.cpus)
 
@@ -76,19 +76,19 @@ process CHECK_BARCODE {
 }
 
 process CAT_FASTQ_10X {
-    tag "${sampleID}"
+    tag "${sample.id}"
     label 'process_high'
 
     input:
-    tuple val(sampleID), path(read1_list), path(read2_list), path(read3_list)
+    tuple val(sample), path(read1_list), path(read2_list), path(read3_list)
 
     output:
-    tuple val(sampleID), path("${sampleID}_1.merged.fq.gz"),         emit: read1
-    tuple val(sampleID), path("${sampleID}_2.merged.fq.gz"),         emit: read2
-    tuple val(sampleID), path("${sampleID}_3.merged.fq.gz"),         emit: read3
+    tuple val(sample), path("${sample.id}_1.merged.fq.gz"),         emit: read1
+    tuple val(sample), path("${sample.id}_2.merged.fq.gz"),         emit: read2
+    tuple val(sample), path("${sample.id}_3.merged.fq.gz"),         emit: read3
 
     script:
-    def prefix   = "${sampleID}"
+    def prefix   = "${sample.id}"
     def read1 = read1_list.collect{ it.toString() }
     def read2 = read2_list.collect{ it.toString() }
     def read3 = read3_list.collect{ it.toString() }
@@ -116,20 +116,20 @@ process CAT_FASTQ_10X {
 }
 
 process CHECK_BARCODE_10X {
-    tag "${sampleID}"
+    tag "${sample.id}"
     label 'process_high'
 
     input:
-    tuple val(sampleID), path(read2), path(read1), path(read3)
+    tuple val(sample), path(read2), path(read1), path(read3)
     path(whitelist)
 
     output:
-    tuple val(sampleID), path("${sampleID}_1.cutadapt_input.fq.gz"), emit: read1
-    tuple val(sampleID), path("${sampleID}_2.cutadapt_input.fq.gz"), emit: read2
-    tuple val(sampleID), path("${sampleID}_barcode_stats.tsv"),      emit: stats
+    tuple val(sample), path("${sample.id}_1.cutadapt_input.fq.gz"), emit: read1
+    tuple val(sample), path("${sample.id}_2.cutadapt_input.fq.gz"), emit: read2
+    tuple val(sample), path("${sample.id}_barcode_stats.tsv"),      emit: stats
 
     script:
-    def prefix   = "${sampleID}"
+    def prefix   = "${sample.id}"
     def pigzThreads = Math.min(6, task.cpus)
 
     """
@@ -156,19 +156,19 @@ process CHECK_BARCODE_10X {
 }
 
 process TRIM_FASTQ {
-    tag "${sampleID}"
+    tag "${sample.id}"
     label 'process_high'
 
     input:
-    tuple val(sampleID), path(read1), path(read2)
+    tuple val(sample), path(read1), path(read2)
 
     output:
-    tuple val(sampleID),   path("*R1.trimmed.fq.gz"), emit: read1
-    tuple val(sampleID),   path("*R2.trimmed.fq.gz"), emit: read2
-    tuple val(sampleID),   path("${sampleID}.cutadapt.json"), emit: report_JSON
+    tuple val(sample),   path("*R1.trimmed.fq.gz"), emit: read1
+    tuple val(sample),   path("*R2.trimmed.fq.gz"), emit: read2
+    tuple val(sample),   path("${sample.id}.cutadapt.json"), emit: report_JSON
 
     script:
-    def prefix   = "${sampleID}"
+    def prefix   = "${sample.id}"
     """
     ## cutadapt QC and trim ME adapter
     cutadapt -j $task.cpus \\
